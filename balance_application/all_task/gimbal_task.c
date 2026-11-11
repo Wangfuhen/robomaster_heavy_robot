@@ -34,7 +34,6 @@ static void Gimbal_CalculateControlOutput(gimbal_control_t *gimbal_control_state
 static fp32 Gimbal_ConvertEncoderCountToYawAngleRadian(uint16_t encoder_count,uint16_t encoder_zero_count);  // YAW轴编码器转角度
 static fp32 Gimbal_ConvertEncoderCountToPitchRotorAngleRadian(uint16_t encoder_count,uint16_t encoder_zero_count);  // PITCH轴编码器转角度
 static void Gimbal_CalculateZeroForceSetpoint(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_state);  // 无力控制
-static void Gimbal_CalculateRelativeAngleSetpoint(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_state);  // 相对角度控制
 static void Gimbal_CalculateAbsoluteAngleSetpoint(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_state);  // 绝对角度控制
 static void Gimbal_CalculateAutomaticAimSetpoint(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_state);  // 自动控制
 static void Gimbal_CalculatePitchScrewSpeedSetpoint(fp32 *rpm, gimbal_control_t *gimbal_control_state);  /* pitch screw fixed speed */
@@ -55,6 +54,7 @@ void Gimbal_Task(void const * argument)
     vTaskDelay(gimbal_initialization_delay_millisecond);  // 延时等待系统初始化完成
     
     Gimbal_Initialize(&mini_gimbal);  // 云台初始化
+		static TickType_t current_time_pointer_in_Tick = pdMS_TO_TICKS(0);
     
     while(1)
     {
@@ -69,7 +69,7 @@ void Gimbal_Task(void const * argument)
         CAN_cmd_gimbal_yaw(mini_gimbal.yaw_axis_state.commanded_torque_current_count);
         CAN_SendPitchAxisTorqueCurrentCommand(mini_gimbal.pitch_axis_state.commanded_torque_current_count);
         
-        vTaskDelay(gimbal_control_loop_period_millisecond);  // 控制周期延时
+        vTaskDelayUntil(&current_time_pointer_in_Tick ,gimbal_control_loop_period_millisecond);  // 控制周期延时
     }
 }
 
@@ -426,25 +426,26 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
     }
     else if(gimbal_control_state->gimbal_mode == GIMBAL_OPERATING_MODE_ENCODER_ANGLE)
     {
-        // 编码器模式：相对角度控制
-        Gimbal_CalculateRelativeAngleSetpoint(&yaw_angle_increment_radian, &pitch_angle_increment_radian, gimbal_control_state);
-        pitch_angle_increment_radian = Gimbal_LimitPitchAngleIncrementRadian(pitch_angle_increment_radian);
-        
-        // 更新相对角度设定值
-        gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian += pitch_angle_increment_radian;
+        // 编码器模式：yaw 用相对角，pitch 统一用 IMU 绝对角
+        Gimbal_CalculateAbsoluteAngleSetpoint(&yaw_angle_increment_radian, &pitch_angle_increment_radian, gimbal_control_state);
+
+        // YAW 轴相对角设定
         gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian += yaw_angle_increment_radian;
-        
+        // PITCH 轴绝对角设定（带速率限制）
+        gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian +=
+            Gimbal_LimitPitchAngleIncrementRadian(pitch_angle_increment_radian);
+
         // YAW轴角度限幅 [-π, π]
         if(gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian > pi)
             gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian -= 2 * pi;
         else if(gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian < -pi)
             gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian += 2 * pi;
-        
-        // PITCH轴角度限幅
-        if(gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian > pitch_axis_relative_angle_maximum_radian)
-            gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian = pitch_axis_relative_angle_maximum_radian;
-        else if(gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian < pitch_axis_relative_angle_minimum_radian)
-            gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian = pitch_axis_relative_angle_minimum_radian;
+
+        // PITCH轴绝对角限幅
+        if(gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian > pitch_axis_absolute_angle_maximum_radian)
+            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = pitch_axis_absolute_angle_maximum_radian;
+        else if(gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian < pitch_axis_absolute_angle_minimum_radian)
+            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = pitch_axis_absolute_angle_minimum_radian;
     }
     else if(gimbal_control_state->gimbal_mode == GIMBAL_OPERATING_MODE_ABSOLUTE_ANGLE)
     {
@@ -563,23 +564,17 @@ static void Gimbal_CalculateControlOutput(gimbal_control_t *gimbal_control_state
                     gimbal_control_state->yaw_axis_state.relative_angular_velocity_radian_per_second,
                     gimbal_control_state->yaw_axis_state.relative_angular_velocity_setpoint_radian_per_second);
         
-        // PITCH轴：LQR控制
-		fp32 pitch_feedback_encoder[3] = {
-            (fp32) gimbal_control_state->pitch_axis_state.relative_angular_velocity_radian_per_second,
-            (fp32) gimbal_control_state->pitch_axis_state.relative_angle_radian,
-            (fp32) gimbal_control_state->pitch_axis_state.motor_measurement_pointer->measured_torque_current_count
-        };
-        
-		fp32 pitch_setpoint_encoder[3] = {
-            0,
-            (fp32) gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian,
-            0
-        };
-        
-		gimbal_control_state->pitch_axis_state.commanded_torque_current_count = 
-            lqr_cal(&gimbal_control_state->pitch_axis_state.encoder_mode_controller,
-                   pitch_feedback_encoder,
-                   pitch_setpoint_encoder);
+        // PITCH 轴：与 GYRO 相同的绝对角串级，编码器只做诊断
+        gimbal_control_state->pitch_axis_state.absolute_angular_velocity_setpoint_radian_per_second =
+            pid_calc_gimbal(&gimbal_control_state->pitch_axis_state.angle_controller,
+                            gimbal_control_state->pitch_axis_state.absolute_angle_radian,
+                            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian);
+
+        gimbal_control_state->pitch_axis_state.commanded_torque_current_count =
+            pitch_axis_motor_rotation_to_joint_angle_sign *
+            pid_calc(&gimbal_control_state->pitch_axis_state.speed_controller,
+                     gimbal_control_state->pitch_axis_state.absolute_angular_velocity_radian_per_second,
+                     gimbal_control_state->pitch_axis_state.absolute_angular_velocity_setpoint_radian_per_second);
     }
     // 陀螺仪模式
     else if(gimbal_control_state->yaw_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE)
@@ -671,17 +666,17 @@ static fp32 Gimbal_ConvertEncoderCountToYawAngleRadian(uint16_t encoder_count, u
 }
 
 /**
- * @brief PITCH轴编码器值转换为角度
+ * @brief PITCH轴编码器值转换为转子角度
  * @param encoder_count 编码器原始值
  * @param encoder_zero_count 编码器零位
- * @return 计算得到的角度值（弧度）
- * @note 处理编码器溢出，将编码器值转换为弧度
+ * @return 转子角度（弧度，不是关节角）
+ * @note 按 M3508 单圈 8192 计数解绕；非线性丝杆映射要等零点和丝杆长度标定后再启用。
  */
 static fp32 Gimbal_ConvertEncoderCountToPitchRotorAngleRadian(uint16_t encoder_count, uint16_t encoder_zero_count)
 {
     int32_t relative_encoder_count = (int32_t)encoder_count - (int32_t)encoder_zero_count;
 
-    // 按 M3508 单圈 8192 计数解绕（原先误用了 9025 的 32768，永远不触发）
+    // 按 M3508 单圈 8192 计数解绕
     if(relative_encoder_count > pitch_axis_half_encoder_count_range)
     {
         relative_encoder_count -= pitch_axis_encoder_count_per_revolution;
@@ -719,31 +714,6 @@ static void Gimbal_CalculateZeroForceSetpoint(fp32 *yaw, fp32 *pitch, gimbal_con
     }
     *yaw = 0.0f;
     *pitch = 0.0f;
-}
-
-/**
- * @brief 相对角度控制函数
- * @param yaw YAW轴角度增量输出
- * @param pitch PITCH轴角度增量输出
- * @param gimbal_control_state 云台控制结构体指针
- * @note 根据遥控器通道和鼠标输入计算角度增量
- */
-static void Gimbal_CalculateRelativeAngleSetpoint(fp32 *yaw, fp32 *pitch, gimbal_control_t *gimbal_control_state)
-{
-    if (yaw == NULL || pitch == NULL || gimbal_control_state == NULL)
-    {
-        return;
-    }
-
-    static int16_t yaw_channel = 0, pitch_channel = 0;
-    
-    // 遥控器通道死区处理
-    Remote_Deadband_Limit(gimbal_control_state->gimbal_dt7_remote_control->rc.ch[yaw_axis_remote_control_channel], yaw_channel, remote_control_deadband_count);
-    Remote_Deadband_Limit(gimbal_control_state->gimbal_dt7_remote_control->rc.ch[pitch_axis_remote_control_channel], pitch_channel, remote_control_deadband_count);
-    
-    // 计算角度增量：遥控器通道 + 鼠标输入
-    *yaw = yaw_channel * yaw_axis_remote_control_sensitivity_radian_per_count - gimbal_control_state->gimbal_dt7_remote_control->mouse.x * yaw_axis_mouse_sensitivity_radian_per_count;
-    *pitch = pitch_channel * pitch_axis_remote_control_sensitivity_radian_per_count + gimbal_control_state->gimbal_dt7_remote_control->mouse.y * pitch_axis_mouse_sensitivity_radian_per_count;
 }
 
 /**

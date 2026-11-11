@@ -108,9 +108,9 @@ static const float pitch_axis_screw_length_minimum_millimeter = 121.49f;
 static const float pitch_axis_screw_length_maximum_millimeter = 254.43f;
 static const float pitch_axis_screw_length_at_zero_angle_millimeter = 159.39f;
 
-/* 以下两个值待实测：断电转丝杆一整圈量导程，数电机圈数得减速比 */
-static const float pitch_axis_screw_lead_millimeter_per_revolution = 8.0f;
-static const float pitch_axis_motor_to_screw_reduction_ratio = 19.2f;
+/* 机构参数（已确认）：导程 2 mm，减速比 19:1（3508 内置减速箱，无额外齿轮） */
+static const float pitch_axis_screw_lead_millimeter_per_revolution = 2.0f;
+static const float pitch_axis_motor_to_screw_reduction_ratio = 19.0f;
 
 /* ============================================================================
  * 编码器模式 LQR（当前不可用，仅保留参数，见问题清单 A1）

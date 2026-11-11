@@ -1,4 +1,4 @@
-﻿#include "can_user.h"
+#include "can_user.h"
 #include "main.h"
 
 extern CAN_HandleTypeDef hcan1;
@@ -11,6 +11,8 @@ static void MotorMeasurement_ParsePayload(motor_measurement_t *measurement, cons
     measurement->rotor_speed_revolution_per_minute = (int16_t)(((uint16_t)payload[2] << 8) | payload[3]);
     measurement->measured_torque_current_count = (int16_t)(((uint16_t)payload[4] << 8) | payload[5]);
     measurement->motor_temperature_degree_celsius = payload[6];
+    measurement->controller_error_code = payload[7];
+    measurement->last_update_time_millisecond = HAL_GetTick();
 }
 	#define get_remote_status(ptr,data)                     \
     {                                                   \
@@ -36,6 +38,8 @@ static void MotorMeasurement_ParsePayloadYaw(motor_measurement_t *measurement, c
     measurement->rotor_speed_revolution_per_minute = (int16_t)(((uint16_t)payload[5] << 8) | payload[4]);
     measurement->measured_torque_current_count = (int16_t)(((uint16_t)payload[3] << 8) | payload[2]);
     measurement->motor_temperature_degree_celsius = payload[1];
+    measurement->controller_error_code = 0U;
+    measurement->last_update_time_millisecond = HAL_GetTick();
 }
 
 

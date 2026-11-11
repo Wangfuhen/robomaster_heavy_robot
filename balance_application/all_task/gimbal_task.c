@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file gimbal_task.c
  * @brief 云台控制任务
  * @note 此文件实现了云台系统的完整控制逻辑，包括初始化、模式切换、反馈更新、控制计算等功能
@@ -290,52 +290,48 @@ static void Gimbal_HandleOperatingModeChange(gimbal_control_t *gimbal_control_st
     {
         return;
     }
-    
-    // YAW轴模式切换处理
-    if(gimbal_control_state->yaw_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ZERO_FORCE && 
-       gimbal_control_state->yaw_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ZERO_FORCE)
+
+    uint8_t pitch_mode_changed =
+        (gimbal_control_state->pitch_axis_state.motor_control_mode !=
+         gimbal_control_state->pitch_axis_state.previous_motor_control_mode);
+    uint8_t yaw_mode_changed =
+        (gimbal_control_state->yaw_axis_state.motor_control_mode !=
+         gimbal_control_state->yaw_axis_state.previous_motor_control_mode);
+
+    if(pitch_mode_changed || yaw_mode_changed)
     {
-        // 无力模式切换处理
-    }
-    else if(gimbal_control_state->yaw_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ENCODER_ANGLE && 
-            gimbal_control_state->yaw_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ENCODER_ANGLE)
-    {
-        // 编码器模式：设置相对角度设定值为当前相对角度
-    	gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian = 
-            gimbal_control_state->yaw_axis_state.relative_angle_radian;
-    }
-    else if(gimbal_control_state->yaw_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE && 
-            gimbal_control_state->yaw_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE)
-    {
-        // 陀螺仪模式：设置绝对角度设定值为当前绝对角度
-        gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = 
+        // 任何模式切换：设定值对齐当前反馈，清空所有控制器历史，保证无扰
+        gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian =
             gimbal_control_state->pitch_axis_state.absolute_angle_radian;
-        gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian = 
+        gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian =
             gimbal_control_state->yaw_axis_state.absolute_angle_radian;
-    }
-    
-    // PITCH轴模式切换处理
-    if(gimbal_control_state->pitch_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ZERO_FORCE && 
-       gimbal_control_state->pitch_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ZERO_FORCE)
-    {
-        // 无力模式切换处理
-    }
-    else if(gimbal_control_state->pitch_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ENCODER_ANGLE && 
-            gimbal_control_state->pitch_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ENCODER_ANGLE)
-    {
-        // 编码器模式：设置相对角度设定值为当前相对角度
-        gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian = 
+        gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian =
             gimbal_control_state->pitch_axis_state.relative_angle_radian;
-    }
-    else if(gimbal_control_state->pitch_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE && 
-            gimbal_control_state->pitch_axis_state.previous_motor_control_mode != MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE)
-    {
-        // 陀螺仪模式：设置绝对角度设定值为当前绝对角度
-        gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = 
-            gimbal_control_state->pitch_axis_state.absolute_angle_radian;
+        gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian =
+            gimbal_control_state->yaw_axis_state.relative_angle_radian;
+
+        gimbal_control_state->pitch_axis_state.pitch_axis_screw_target_rotor_speed_revolution_per_minute = 0.0f;
+        gimbal_control_state->pitch_axis_state.relative_angular_velocity_setpoint_radian_per_second = 0.0f;
+        gimbal_control_state->pitch_axis_state.absolute_angular_velocity_setpoint_radian_per_second = 0.0f;
+        gimbal_control_state->yaw_axis_state.relative_angular_velocity_setpoint_radian_per_second = 0.0f;
+        gimbal_control_state->yaw_axis_state.absolute_angular_velocity_setpoint_radian_per_second = 0.0f;
+
+        pid_clear(&gimbal_control_state->pitch_axis_state.angle_controller);
+        pid_clear(&gimbal_control_state->pitch_axis_state.speed_controller);
         pid_clear(&gimbal_control_state->pitch_axis_state.screw_speed_controller);
+        pid_clear(&gimbal_control_state->pitch_axis_state.relative_angle_controller);
+        pid_clear(&gimbal_control_state->pitch_axis_state.relative_speed_controller);
+        pid_clear(&gimbal_control_state->pitch_axis_state.automatic_aim_angle_controller);
+        pid_clear(&gimbal_control_state->pitch_axis_state.automatic_aim_speed_controller);
+
+        pid_clear(&gimbal_control_state->yaw_axis_state.angle_controller);
+        pid_clear(&gimbal_control_state->yaw_axis_state.speed_controller);
+        pid_clear(&gimbal_control_state->yaw_axis_state.relative_angle_controller);
+        pid_clear(&gimbal_control_state->yaw_axis_state.relative_speed_controller);
+        pid_clear(&gimbal_control_state->yaw_axis_state.automatic_aim_angle_controller);
+        pid_clear(&gimbal_control_state->yaw_axis_state.automatic_aim_speed_controller);
     }
-    
+
     // 保存当前模式为上一次模式
 	gimbal_control_state->pitch_axis_state.previous_motor_control_mode = 
         gimbal_control_state->pitch_axis_state.motor_control_mode;
@@ -385,6 +381,29 @@ static void Gimbal_UpdateFeedback(gimbal_control_t *gimbal_control_state)
 }
 
 /**
+ * @brief 限制 pitch 设定值每个控制周期的最大变化量
+ * @param increment_radian 本周期期望的角度增量
+ * @return 限幅后的角度增量
+ * @note 避免设定值跑得比执行器快，解决“松手后追目标、过冲”的问题
+ */
+static fp32 Gimbal_LimitPitchAngleIncrementRadian(fp32 increment_radian)
+{
+    const fp32 maximum_increment_radian =
+        pitch_axis_setpoint_rate_limit_radian_per_second *
+        ((fp32)gimbal_control_loop_period_millisecond / 1000.0f);
+
+    if(increment_radian > maximum_increment_radian)
+    {
+        return maximum_increment_radian;
+    }
+    if(increment_radian < -maximum_increment_radian)
+    {
+        return -maximum_increment_radian;
+    }
+    return increment_radian;
+}
+
+/**
  * @brief 根据模式设置控制输入
  * @param gimbal_control_state 云台控制结构体指针
  * @note 根据不同的控制模式计算控制增量，并更新设定值
@@ -409,6 +428,7 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
     {
         // 编码器模式：相对角度控制
         Gimbal_CalculateRelativeAngleSetpoint(&yaw_angle_increment_radian, &pitch_angle_increment_radian, gimbal_control_state);
+        pitch_angle_increment_radian = Gimbal_LimitPitchAngleIncrementRadian(pitch_angle_increment_radian);
         
         // 更新相对角度设定值
         gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian += pitch_angle_increment_radian;
@@ -434,6 +454,9 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
         // 更新绝对角度设定值
         Gimbal_CalculatePitchScrewSpeedSetpoint(&pitch_target_rotor_speed_revolution_per_minute, gimbal_control_state);
         gimbal_control_state->pitch_axis_state.pitch_axis_screw_target_rotor_speed_revolution_per_minute = pitch_target_rotor_speed_revolution_per_minute;
+        // 角度设定值跟随实测，保证从 GYRO 切到 AUTO 时不跳变
+        gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian =
+            gimbal_control_state->pitch_axis_state.absolute_angle_radian;
         gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian += yaw_angle_increment_radian;
         
         // 处理云台掉头逻辑
@@ -467,16 +490,23 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
         if(gimbal_control_state->hero_pc->pc_fire_mode == 1 || 
            gimbal_control_state->hero_pc->pc_fire_mode == 2)  // 有目标
         {
-            // 自动控制：使用PC发送的目标角度
+            // 自动控制：使用PC发送的目标角度，按最大速率逼近，避免阶跃
             Gimbal_CalculateAutomaticAimSetpoint(&yaw_angle_increment_radian, &pitch_angle_increment_radian, gimbal_control_state);
-            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = pitch_angle_increment_radian;
+            {
+                fp32 angle_difference_radian =
+                    pitch_angle_increment_radian -
+                    gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian;
+                gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian +=
+                    Gimbal_LimitPitchAngleIncrementRadian(angle_difference_radian);
+            }
             gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian = yaw_angle_increment_radian;
         }
         else
         {
             // 无目标时使用绝对角度控制
             Gimbal_CalculateAbsoluteAngleSetpoint(&yaw_angle_increment_radian, &pitch_angle_increment_radian, gimbal_control_state);
-            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian += pitch_angle_increment_radian;
+            gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian +=
+                Gimbal_LimitPitchAngleIncrementRadian(pitch_angle_increment_radian);
             gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian += yaw_angle_increment_radian;
         }
         
@@ -500,6 +530,19 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
  */
 static void Gimbal_CalculateControlOutput(gimbal_control_t *gimbal_control_state)
 {
+    const motor_measurement_t *pitch_measurement =
+        gimbal_control_state->pitch_axis_state.motor_measurement_pointer;
+
+    // 电调报错或反馈超时：切断输出，避免按旧数据继续积分
+    if(pitch_measurement->controller_error_code != 0U ||
+       (HAL_GetTick() - pitch_measurement->last_update_time_millisecond) >
+           pitch_axis_feedback_timeout_millisecond)
+    {
+        gimbal_control_state->pitch_axis_state.commanded_torque_current_count = 0.0f;
+        gimbal_control_state->yaw_axis_state.commanded_torque_current_count = 0.0f;
+        return;
+    }
+
     // 无力模式
     if(gimbal_control_state->yaw_axis_state.motor_control_mode == MOTOR_CONTROL_MODE_ZERO_FORCE)
     {

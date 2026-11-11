@@ -1,4 +1,4 @@
-﻿#ifndef GIMBAL_CONFIGURATION_H
+#ifndef GIMBAL_CONFIGURATION_H
 #define GIMBAL_CONFIGURATION_H
 
 #include "c_data_typedef.h"
@@ -90,6 +90,12 @@ static const float pitch_axis_motor_rotation_to_joint_angle_sign = -1.0f;
 static const float pitch_axis_inertial_measurement_angular_velocity_sign = +1.0f;
 static const float pitch_axis_screw_stick_direction_sign = +1.0f;
 
+/* 反馈超时：超过该时间没有收到 C620 反馈就切断输出 */
+static const uint32_t pitch_axis_feedback_timeout_millisecond = 20U;
+
+/* 设定值速率限制：遥控器/鼠标/PC 目标每周期最多变化多少 */
+static const float pitch_axis_setpoint_rate_limit_radian_per_second = 0.30f;
+
 /* ============================================================================
  * 丝杆运动学（由实测/几何推导，单位统一为毫米与弧度）
  *     x^2 = C1 - C2 * cos(A + offset)
@@ -147,7 +153,7 @@ static const float pitch_axis_screw_speed_maximum_integral_output = 3000.0f;
 static const float pitch_axis_absolute_angle_proportional_gain = 35.0f;
 static const float pitch_axis_absolute_angle_integral_gain = 0.0f;
 static const float pitch_axis_absolute_angle_derivative_gain = 0.0f;
-static const float pitch_axis_absolute_angle_maximum_output_radian_per_second = 300.0f;
+static const float pitch_axis_absolute_angle_maximum_output_radian_per_second = 0.35f;
 static const float pitch_axis_absolute_angle_maximum_integral_output = 2.1f;
 
 static const float pitch_axis_absolute_speed_proportional_gain = 3000.0f;
@@ -162,7 +168,7 @@ static const float pitch_axis_absolute_speed_maximum_integral_output = 10000.0f;
 static const float pitch_axis_automatic_aim_angle_proportional_gain = 40.5f;
 static const float pitch_axis_automatic_aim_angle_integral_gain = 0.0f;
 static const float pitch_axis_automatic_aim_angle_derivative_gain = 0.5f;
-static const float pitch_axis_automatic_aim_angle_maximum_output_radian_per_second = 30.0f;
+static const float pitch_axis_automatic_aim_angle_maximum_output_radian_per_second = 0.35f;
 static const float pitch_axis_automatic_aim_angle_maximum_integral_output = 2.1f;
 
 static const float pitch_axis_automatic_aim_speed_proportional_gain = 3500.0f;

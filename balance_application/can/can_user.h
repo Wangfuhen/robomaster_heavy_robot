@@ -1,4 +1,4 @@
-﻿#ifndef CAN_USER_H
+#ifndef CAN_USER_H
 #define CAN_USER_H
 /*
                                                                                                                                                                     
@@ -72,6 +72,8 @@ typedef struct
     int16_t rotor_speed_revolution_per_minute;      //转子转动速度 每分钟转
     int16_t measured_torque_current_count;  //转子转矩电流
     uint8_t motor_temperature_degree_celsius;      //转子温度
+    uint8_t controller_error_code;                  // C620 DATA[7] 错误码
+    uint32_t last_update_time_millisecond;          // 最近一次收到反馈的时间
     int16_t previous_encoder_count;       //上一次编码器值
     int16_t encoder_count_difference;      //增量
     int16_t revolution_count;          //转的圈数

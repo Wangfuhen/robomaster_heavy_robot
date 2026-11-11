@@ -1,0 +1,23 @@
+# Keil build output
+MDK-ARM/25_mini_gimbal/
+MDK-ARM/pdf_output/
+*.uvguix.*
+*.o
+*.crf
+*.d
+*.dep
+*.axf
+*.hex
+*.map
+*.lst
+*.lnp
+*.build_log.htm
+JLinkLog.txt
+
+# Local editor / OS
+.vscode/
+*.bak
+*.before_*
+*.刘
+*.Lenovo
+*.wangf

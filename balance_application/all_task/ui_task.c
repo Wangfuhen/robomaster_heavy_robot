@@ -20,7 +20,7 @@
  *       上传到客户端界面显示。本质是往 USART6 发一串符合裁判系统“交互数据”协议的帧。
  *
  * 绘制内容：超级电容电压条（按剩余量分段变色：绿/粉/橙/品红，低电量警示），
- *           以及超级电容数值框（FLOAT 浮点显示 V_cap_value，单位 V）。
+ *           以及超级电容数值框（FLOAT 浮点显示 voltage_volt，单位 V）。
  *
  * 任务节奏（Ui_Task，每周期 1ms）：
  *   - i%100==0  ：每 100ms 刷新一次“框架”图（RECTANGLE 静态框）；
@@ -31,7 +31,7 @@
  *   - 帧 = 帧头(含长度) + CRC8 + 命令码 + 数据段头 + 图形数据 + CRC16；
  *   - 发送 ID = 本机 robot_id，接收 ID 由 mini_ui_flag_updata 按 robot_id 查表映射。
  */
-extern super_cap_t super_cap;
+extern super_capacitor_measurement_t super_capacitor_measurement;
 
 /*功能函数区*/
 //画字符
@@ -105,7 +105,7 @@ static void mini_ui_flag_updata(void);
 static void supercapacitor_figure(fp32 remain_energy,uint32_t turning_point);
 static /**
  * @brief   组装并发送“超级电容数值”交互图形帧（FLOAT 浮点显示电压）
- * @note    用 FLOAT 图形类型把 super_cap.V_cap_value 数值直接绘制在客户端界面。
+ * @note    用 FLOAT 图形类型把 super_capacitor_measurement.voltage_volt 数值直接绘制在客户端界面。
  */
 void Float_supercapacitor_update();//超级电容条绘制
 /**
@@ -295,7 +295,7 @@ static void mini_ui_flag_updata(void)
         Recieve_id = 0x168;
     }
 	ui_self_id=RM_Referee_system.robot_state.robot_id;
-	global_supercapacitor_remain = (super_cap.V_cap_value);
+	global_supercapacitor_remain = (super_capacitor_measurement.voltage_volt);
 }
 /**
  * @brief   绘制超级电容电量条（LINE 线段，按剩余量分段变色）
@@ -361,7 +361,7 @@ void Client_supercapacitor_update()//超级电容条绘制
 
 /**
  * @brief   组装并发送“超级电容数值”交互图形帧（FLOAT 浮点显示电压）
- * @note    用 FLOAT 图形类型把 super_cap.V_cap_value 数值直接绘制在客户端界面。
+ * @note    用 FLOAT 图形类型把 super_capacitor_measurement.voltage_volt 数值直接绘制在客户端界面。
  */
 void Float_supercapacitor_update()//超级电容框绘制
 {
@@ -378,7 +378,7 @@ void Float_supercapacitor_update()//超级电容框绘制
     super_data.dataFrameHeader.send_ID     =  RM_Referee_system.robot_state.robot_id;
     super_data.dataFrameHeader.receiver_ID = Recieve_id;
     //数据段
-	Figure_Graphic(super_data.clientData,"SR1",1,FLOAT,5,CYAN_BLUE,0,0,5,(680),95,0, (680+600),super_cap.V_cap_value);
+	Figure_Graphic(super_data.clientData,"SR1",1,FLOAT,5,CYAN_BLUE,0,0,5,(680),95,0, (680+600),super_capacitor_measurement.voltage_volt);
     memcpy(CliendTxBuffer+LEN_FRAME_HEAD, (uint8_t*)&super_data.CmdID, LEN_CMD_ID+super_data.txFrameHeader.data_length);//加上命令码长度2
 
     //帧尾

@@ -100,9 +100,9 @@ void Referee_Usart_Task(void *argument)
     while(1)
     {
         referee_unpack_fifo_data();
-		CAN_cmd_cap(&RM_Referee_system);
-		CAN_chassis_send_gimbal(&RM_Referee_system);
-		CAN_chassis_ramp_pitch_to_gimbal(pitch);
+		CAN_SendSuperCapacitorCommand(&RM_Referee_system);
+		CAN_SendGimbalData(&RM_Referee_system);
+		CAN_SendChassisPitchToGimbal(pitch);
         osDelay(5);
     }
 }

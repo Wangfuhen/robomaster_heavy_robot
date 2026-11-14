@@ -48,7 +48,7 @@ typedef enum
     /****  hcan2  底盘电机  ****/
     
     CAN2_yaw_motor_id=0x141,      //yaw轴电机
-    CAN1_trigger_motor_id=0x201,//拨弹电机
+    CAN2_trigger_motor_id=0x201,//拨弹电机
 
     /*gimbal_motor_send_flag_id*/
 	//CAN1
@@ -108,9 +108,9 @@ typedef struct
 	uint8_t y_key_data;       //两位 Y_key
 	uint8_t chassis_mode;     //两位 底盘模式
 	uint8_t cap_mode;         //一位 超电
-	uint8_t top_mode;         //一位 小陀螺
-	uint8_t follow_mode;      //一位 一键掉头使用
-	uint8_t follow_mode_last; //一位 一键掉头使用
+	uint8_t top_mode;         //一位 小陀螺（【已停用】加装机械臂后不再支持，恒为 0）
+	uint8_t follow_mode;      //一位 一键掉头使用（【已停用】加装机械臂后不再支持，恒为 0）
+	uint8_t follow_mode_last; //一位 一键掉头使用（【已停用】加装机械臂后不再支持，恒为 0）
 	uint8_t key_control;      //使用键盘控制进入比赛模式
 }gimbal_c_send_data_t;
 

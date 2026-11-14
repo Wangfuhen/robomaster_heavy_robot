@@ -43,6 +43,9 @@ static const float motor_encoder_count_to_rotor_radian = 0.000766990394f;
 
 /* ------------------------------------------------------------ 零点位置 */
 enum { yaw_axis_zero_encoder_count = 6533 };
+/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+   yaw_axis_reversal_zero_encoder_count / yaw_axis_reversal_wait_cycle_count
+   仅保留定义备查（gimbal_task.c 中对应的掉头解析与角度补偿已注释，当前无引用）。 */
 enum { yaw_axis_reversal_zero_encoder_count = 0 };
 enum { yaw_axis_reversal_wait_cycle_count = 1600 };
 enum { pitch_axis_zero_encoder_count = 1891 };
@@ -59,6 +62,8 @@ enum { remote_control_deadband_count = 10 };
 enum { remote_control_left_switch = 1 };
 enum { remote_control_right_switch = 0 };
 
+/* 【已停用】一键掉头至正位的触发键：加装机械臂后不再支持该模式，
+   解析代码已注释（当前无引用），仅保留定义备查。 */
 static const uint16_t gimbal_heading_reversal_key = KEY_PRESSED_OFFSET_E;
 
 /* ------------------------------------------------------------ 角度限幅 */

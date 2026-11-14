@@ -135,11 +135,13 @@ typedef enum
 /**
  * @brief 云台跟随状态枚举
  * @note 定义云台的朝向状态
+ * @note【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+ *       GIMBAL_HEADING_REVERSED 仅为兼容底盘通信协议而保留，运行中不会再被使用。
  */
 typedef enum
 {
-	GIMBAL_HEADING_FORWARD,   // 正常前向状态
-    GIMBAL_HEADING_REVERSED,  // 掉头前向状态
+	GIMBAL_HEADING_FORWARD,   // 正常前向状态（掉头停用后恒为该值）
+    GIMBAL_HEADING_REVERSED,  // 掉头前向状态（【已停用】加装机械臂后不再支持）
 } gimbal_heading_state_t;
 
 /**
@@ -192,15 +194,19 @@ typedef struct
 /**
  * @brief 云台状态切换数据结构体
  * @note 用于管理云台的状态切换和掉头逻辑
+ * @note【已停用】掉头逻辑：机器人加装机械臂后不再支持“掉头至正位”，
+ *       gimbal_task.c 中相关解析与角度补偿已注释，本结构体仅保留字段与初始化，
+ *       heading_state / previous_heading_state 恒为 GIMBAL_HEADING_FORWARD，
+ *       各切换标志与计时器恒为 0。
  */
 typedef struct
 {
-	gimbal_heading_state_t heading_state;       // 当前云台方向状态
-	gimbal_heading_state_t previous_heading_state;  // 上一次云台方向状态
-	uint8_t  heading_state_change_flag;                      // 云台方向切换标志
-	uint32_t heading_state_change_time_millisecond;                      // 云台方向切换计时器
-	uint32_t heading_state_chassis_time_millisecond;              // 云台与底盘切换计时器
-	uint8_t  heading_state_chassis_change_flag;             // 云台与底盘切换标志
+	gimbal_heading_state_t heading_state;       // 当前云台方向状态（【已停用】恒为前向）
+	gimbal_heading_state_t previous_heading_state;  // 上一次云台方向状态（【已停用】恒为前向）
+	uint8_t  heading_state_change_flag;                      // 云台方向切换标志（【已停用】恒为 0）
+	uint32_t heading_state_change_time_millisecond;                      // 云台方向切换计时器（【已停用】不再更新）
+	uint32_t heading_state_chassis_time_millisecond;              // 云台与底盘切换计时器（【已停用】不再更新）
+	uint8_t  heading_state_chassis_change_flag;             // 云台与底盘切换标志（【已停用】恒为 0）
 } gimbal_heading_transition_t;
 
 /**

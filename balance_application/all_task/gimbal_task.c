@@ -3,6 +3,11 @@
  * @brief 云台控制任务
  * @note 此文件实现了云台系统的完整控制逻辑，包括初始化、模式切换、反馈更新、控制计算等功能
  *       支持多种控制模式：无力模式、编码器模式、陀螺仪模式、自动瞄准模式
+ * @note 【模式裁剪】机器人加装机械臂后，云台/底盘不再有掉头（±π）的回转空间，
+ *       “一键掉头至正位”模式已停用：遥控器解析中的掉头触发（通道4 / E 键）
+ *       与掉头角度补偿均已注释，云台朝向恒为 GIMBAL_HEADING_FORWARD。
+ *       相关位置均以【已停用】标注，详见 Gimbal_UpdateOperatingMode 与
+ *       Gimbal_UpdateControlSetpoint。
  */
 
 #include "gimbal_task.h"
@@ -98,8 +103,8 @@ static void Gimbal_Initialize(gimbal_control_t *gimbal_control_state)
     gimbal_control_state->pitch_axis_state.motor_control_mode = MOTOR_CONTROL_MODE_ZERO_FORCE;
     gimbal_control_state->pitch_axis_state.previous_motor_control_mode = MOTOR_CONTROL_MODE_ZERO_FORCE;
     
-    // 初始化云台方向状态
-	gimbal_control_state->heading_transition.heading_state = GIMBAL_HEADING_FORWARD;  // 默认前向
+    // 初始化云台方向状态（【已停用】掉头模式：朝向恒为前向，不再切换）
+	gimbal_control_state->heading_transition.heading_state = GIMBAL_HEADING_FORWARD;  // 默认前向（掉头已停用，恒为该值）
 	gimbal_control_state->heading_transition.previous_heading_state = GIMBAL_HEADING_FORWARD;
     
     // 初始化Yaw轴零位
@@ -160,7 +165,7 @@ static void Gimbal_Initialize(gimbal_control_t *gimbal_control_state)
 	gimbal_control_state->pitch_axis_state.absolute_angle_setpoint_radian = gimbal_control_state->pitch_axis_state.relative_angle_setpoint_radian = 0;
 	gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian = gimbal_control_state->yaw_axis_state.relative_angle_setpoint_radian = 0;
     
-    // 初始化云台方向变化相关参数
+    // 初始化云台方向变化相关参数（【已停用】掉头逻辑已注释，这些量不再被更新，仅保留初始化）
 	gimbal_control_state->heading_transition.heading_state_change_flag = 0;
 	gimbal_control_state->heading_transition.heading_state_change_time_millisecond = 0;
 	gimbal_control_state->heading_transition.heading_state_chassis_time_millisecond = 0;
@@ -174,6 +179,8 @@ static void Gimbal_Initialize(gimbal_control_t *gimbal_control_state)
  * @brief 设置云台控制模式
  * @param gimbal_control_state 云台控制结构体指针
  * @note 根据遥控器开关状态设置云台的控制模式
+ * @note【已停用】一键掉头至正位（掉头模式）：因机器人加装机械臂，遥控器通道4 / E 键
+ *       的掉头触发解析已注释，云台朝向恒为 GIMBAL_HEADING_FORWARD，详见函数内说明。
  */
 static void Gimbal_UpdateOperatingMode(gimbal_control_t *gimbal_control_state)
 {
@@ -194,6 +201,20 @@ static void Gimbal_UpdateOperatingMode(gimbal_control_t *gimbal_control_state)
 		}
 		else  // 开启自瞄的时候不允许掉头
 		{
+			/* ================================================================
+			 * 【已停用】一键掉头至正位（掉头模式）的遥控器读值解析
+			 * ----------------------------------------------------------------
+			 * 原因：机器人加装机械臂后，云台/底盘没有掉头（±π）的回转空间，
+			 *       无法再支持“掉头至正位”模式。
+			 * 处理：这里把“遥控器通道4(ch[4]) ≥ 300 或 按下 E 键”触发掉头
+			 *       状态切换的解析代码整段注释掉。
+			 * 现状：heading_state 恒为 GIMBAL_HEADING_FORWARD，
+			 *       yaw 零位恒为 yaw_axis_zero_encoder_count，
+			 *       掉头标志/计时器保持初始化值 0，不再更新。
+			 * 恢复：取消下面整段注释，并同步恢复 Gimbal_UpdateControlSetpoint()
+			 *       中“掉头角度补偿”的注释。
+			 * ================================================================
+			 * ↓↓↓ 以下为停用代码（保留备查） ↓↓↓
             // 保存上一次的云台方向
 			gimbal_control_state->heading_transition.previous_heading_state = gimbal_control_state->heading_transition.heading_state;
             
@@ -232,6 +253,8 @@ static void Gimbal_UpdateOperatingMode(gimbal_control_t *gimbal_control_state)
 			{
 				gimbal_control_state->heading_transition.heading_state_change_time_millisecond = yaw_axis_reversal_wait_cycle_count;
 			}
+			 * ↑↑↑ 停用代码结束 ↑↑↑
+			 * ================================================================ */
 		}
 	}
 	else  // 调试模式
@@ -460,6 +483,17 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
             gimbal_control_state->pitch_axis_state.absolute_angle_radian;
         gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian += yaw_angle_increment_radian;
         
+		/* ================================================================
+		 * 【已停用】一键掉头至正位的角度补偿（yaw 设定值 ±π 修正）
+		 * ----------------------------------------------------------------
+		 * 原因：机器人加装机械臂后，云台/底盘不再有 ±π 的掉头回转空间，
+		 *       无法继续支持“掉头至正位”模式。
+		 * 现状：heading_state 与 previous_heading_state 恒为
+		 *       GIMBAL_HEADING_FORWARD（见 Gimbal_UpdateOperatingMode），
+		 *       因此这里不再对 yaw 绝对角设定值做 ±π 修正。
+		 * 恢复：取消下面整段注释即可（同时恢复遥控器解析中的掉头触发）。
+		 * ================================================================
+		 * ↓↓↓ 以下为停用代码（保留备查） ↓↓↓
         // 处理云台掉头逻辑
 		if(gimbal_control_state->heading_transition.heading_state != 
            gimbal_control_state->heading_transition.previous_heading_state)
@@ -477,6 +511,8 @@ static void Gimbal_UpdateControlSetpoint(gimbal_control_t *gimbal_control_state)
                     gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian - pi;
 			}
 		}
+		 * ↑↑↑ 停用代码结束 ↑↑↑
+		 * ================================================================ */
         
         // YAW轴角度限幅 [-π, π]
         if(gimbal_control_state->yaw_axis_state.absolute_angle_setpoint_radian > pi)

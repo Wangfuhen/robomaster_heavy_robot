@@ -121,7 +121,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
             MotorMeasurement_ParsePayloadYaw(&gimbal_motor_measurements[5],rx_data);
             break;
         }
-				 case CAN1_trigger_motor_id:  //201
+				 case CAN2_trigger_motor_id:  //201
         {
             MotorMeasurement_ParsePayload(&gimbal_motor_measurements[4],rx_data);
             break;
@@ -244,6 +244,9 @@ void CAN_gimbal_send_chassis(gimbal_c_send_data_t *gimbal_send_data)
     gimbal_send_chassis_data[2] = (gimbal_send_data->y_rc_data>>8);
     gimbal_send_chassis_data[3] = (gimbal_send_data->y_rc_data);
     gimbal_send_chassis_data[4] = ((gimbal_send_data->x_key_data<<6)&(3<<6))|((gimbal_send_data->y_key_data<<4)&(3<<4));  //剩余四位
+    /* 说明：top_mode（小陀螺）/ follow_mode、follow_mode_last（一键掉头至正位）
+       因机器人加装机械臂已停用，由 chassis_data_task.c 固定填 0，
+       此处保留协议位（bit4~bit2）不变，底盘侧对应解析也已注释。 */
     gimbal_send_chassis_data[5] = ((gimbal_send_data->chassis_mode<<6)&(3<<6))|((gimbal_send_data->cap_mode<<5)&(1<<5))|((gimbal_send_data->top_mode<<4)&(1<<4))|((gimbal_send_data->follow_mode<<3)&(1<<3))|((gimbal_send_data->follow_mode_last<<2)&(1<<2))|((gimbal_send_data->key_control<<1)&(1<<1));  //剩余一位
     gimbal_send_chassis_data[6] = (0);
     gimbal_send_chassis_data[7] = (0);

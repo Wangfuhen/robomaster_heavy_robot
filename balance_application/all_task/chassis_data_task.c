@@ -64,8 +64,14 @@ static void mini_chassis_mode_set(gimbal_c_send_data_t *gimbal_send_data,gimbal_
 	Remote_Deadband_Limit(mini_gimbal->gimbal_dt7_remote_control->rc.ch[X_rc_channel],x_rc,10);
 	Remote_Deadband_Limit(mini_gimbal->gimbal_dt7_remote_control->rc.ch[Y_rc_channel],y_rc,10);
 	
+	/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+	   云台朝向状态恒为 GIMBAL_HEADING_FORWARD，因此发往底盘的
+	   follow_mode / follow_mode_last 固定为 0（正常跟随方向）。
 	gimbal_send_data->follow_mode=mini_gimbal->heading_transition.heading_state;
 	gimbal_send_data->follow_mode_last=mini_gimbal->heading_transition.previous_heading_state;
+	*/
+	gimbal_send_data->follow_mode=0;
+	gimbal_send_data->follow_mode_last=0;
 	
 	if(switch_is_up(mini_gimbal->gimbal_dt7_remote_control->rc.s[remote_control_right_switch])) //进入比赛模式
 	{
@@ -105,6 +111,8 @@ static void mini_chassis_mode_set(gimbal_c_send_data_t *gimbal_send_data,gimbal_
 			gimbal_send_data->cap_mode=0;
 		}
 
+		/* 【已停用】小陀螺：机器人加装机械臂后无法再支持小陀螺模式，
+		   这里把遥控器 C 键（TOP_ON_KEY）的解析整段注释，top_mode 恒为 0。
 		if(mini_gimbal->gimbal_dt7_remote_control->key.v&TOP_ON_KEY)
 		{
 			gimbal_send_data->top_mode=1;
@@ -113,6 +121,8 @@ static void mini_chassis_mode_set(gimbal_c_send_data_t *gimbal_send_data,gimbal_
 		{
 			gimbal_send_data->top_mode=0;
 		}
+		*/
+		gimbal_send_data->top_mode=0;
 	}
 	else //调试
 	{
@@ -131,6 +141,8 @@ static void mini_chassis_mode_set(gimbal_c_send_data_t *gimbal_send_data,gimbal_
 				gimbal_send_data->cap_mode=0;
 			}
 			
+			/* 【已停用】小陀螺：机器人加装机械臂后无法再支持小陀螺模式，
+			   这里把遥控器通道4下拨进入小陀螺的解析整段注释，top_mode 恒为 0。
 			if(mini_gimbal->gimbal_dt7_remote_control->rc.ch[4]<-300)
 			{
 				gimbal_send_data->top_mode=1;
@@ -139,6 +151,8 @@ static void mini_chassis_mode_set(gimbal_c_send_data_t *gimbal_send_data,gimbal_
 			{
 				gimbal_send_data->top_mode=0;
 			}
+			*/
+			gimbal_send_data->top_mode=0;
 		}
 		else if(switch_is_down(mini_gimbal->gimbal_dt7_remote_control->rc.s[remote_control_right_switch]))
 		{

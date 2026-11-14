@@ -41,6 +41,8 @@
 #define RGHTWARD        KEY_PRESSED_OFFSET_D 
 #define LEFTWARD        KEY_PRESSED_OFFSET_A 
 #define CAP_ON_KEY      KEY_PRESSED_OFFSET_SHIFT
+/* 【已停用】小陀螺开关键：加装机械臂后不再支持小陀螺模式，
+   chassis_data_task.c 中对 TOP_ON_KEY 的解析已注释，此宏仅保留备查。 */
 #define TOP_ON_KEY      KEY_PRESSED_OFFSET_C
 
 #define CHASSIS_DATA_DELAY 300

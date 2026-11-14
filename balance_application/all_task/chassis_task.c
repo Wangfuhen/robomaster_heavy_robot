@@ -22,6 +22,11 @@
  *   CHASSIS_OPERATING_MODE_INDEPENDENT : 不随云台（平移，不自旋）
  *   CHASSIS_OPERATING_MODE_FOLLOW_GIMBAL    : 云台跟随（平移 + 跟随云台 yaw 自旋）
  *
+ * 【模式裁剪】机器人加装机械臂后，底盘不再支持以下两种模式（解析与控制分支均已注释）：
+ *   - 小陀螺：top_spin_mode 恒为 TOP_SPIN_MODE_OFF，遥控器 C 键 / 通道4 的解析不再生效；
+ *   - 掉头至正位：follow_gimbal_transition.state 恒为 CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL，
+ *     云台侧掉头解析、底盘侧掉头等待与速度反向逻辑均已停用。
+ *
  * 速度约定（单位统一）：
  *   - 平移速度 forward_speed_revolution_per_minute / leftward_speed_revolution_per_minute        : 底盘坐标系，单位 rpm（麦轮转速折算，见 MOTOR_SPEED_TO_CHASSIS_SPEED_*）
  *   - 自旋角速度 rotation_speed_radian_per_second           : 单位 rpm（已按电机编码折算）
@@ -49,6 +54,9 @@ static void Chassis_Initialize(chassis_control_t *chassis_control_state);       
  * @param   chassis_control_state  底盘控制结构体指针
  * @note    把来自云台（gimbal_command_data_pointer）的 mode/super_capacitor_mode/top_spin_mode/follow_gimbal_state
  *          整数编码翻译为对应的底盘枚举模式，供后续控制逻辑分支使用。
+ * @note【已停用】机器人加装机械臂后不再支持小陀螺与“掉头至正位”，
+ *       本函数中 top_spin_mode / follow_gimbal_state 的解析已注释，
+ *       对应状态恒为 TOP_SPIN_MODE_OFF / CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL。
  */
 static void Chassis_ParseOperatingMode(chassis_control_t *chassis_control_state);                                       //底盘模式设置
 /**
@@ -90,8 +98,8 @@ static void Chassis_CalculateSpeedControlOutput(chassis_control_t *chassis_contr
  * @param   chassis_control_state  底盘控制结构体指针
  * @note    流程：
  *          1. 按 keyboard_control_enabled 选择键盘或遥控器作为 forward_speed_revolution_per_minute/leftward_speed_revolution_per_minute 平移来源；
- *          2. 若陀螺开启（TOP_SPIN_MODE_ON）按方向设定自旋 rotation_speed_radian_per_second；陀螺关闭且跟随云台时用
- *             跟随 PID 把 rotation_speed_radian_per_second 对齐云台（含掉头切换的等待/平滑处理）；
+ *          2. 【已停用】小陀螺（TOP_SPIN_MODE_ON）已停用，陀螺恒为关闭；跟随云台时用
+ *             跟随 PID 把 rotation_speed_radian_per_second 对齐云台（掉头等待/平滑处理也已停用）；
  *          3. 得到 forward_speed_setpoint_revolution_per_minute/leftward_speed_setpoint_revolution_per_minute/rotation_speed_setpoint_radian_per_second（速度单位：rpm）；
  *          4. 云台跟随模式下把平移速度旋转到云台系（坐标系旋转变换）；
  *          5. rotation_speed_radian_per_second 经一阶低通（First_Lpf_Calc），forward_speed_revolution_per_minute/leftward_speed_revolution_per_minute 经斜坡规划（slope_plan）限速；
@@ -194,7 +202,7 @@ static void Chassis_Initialize(chassis_control_t *chassis_control_state)
     }
     chassis_control_state->operating_mode = CHASSIS_OPERATING_MODE_ZERO_FORCE;
     chassis_control_state->super_capacitor_mode = SUPER_CAPACITOR_MODE_OFF;
-    chassis_control_state->top_spin_mode = TOP_SPIN_MODE_OFF;
+    chassis_control_state->top_spin_mode = TOP_SPIN_MODE_OFF;  // 【已停用】小陀螺：恒为关闭
     chassis_control_state->forward_speed_revolution_per_minute = 0;
     chassis_control_state->leftward_speed_revolution_per_minute = 0;
     chassis_control_state->rotation_speed_radian_per_second = 0;
@@ -211,6 +219,7 @@ static void Chassis_Initialize(chassis_control_t *chassis_control_state)
     chassis_control_state->power_available_watt = 0;
     chassis_control_state->power_maximum_watt = 0;
     chassis_control_state->mechanical_power_watt = 0;
+	/* 【已停用】一键掉头至正位：跟随状态恒为 NORMAL，下面的掉头计时/等待标志仅保留初始化 */
 	chassis_control_state->follow_gimbal_transition.state = CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL;
 	chassis_control_state->follow_gimbal_transition.gimbal_turnaround_elapsed_time_millisecond=0;
 	chassis_control_state->follow_gimbal_transition.chassis_response_pending=0;
@@ -261,6 +270,9 @@ static void Chassis_Initialize(chassis_control_t *chassis_control_state)
  * @param   chassis_control_state  底盘控制结构体指针
  * @note    把来自云台（gimbal_command_data_pointer）的 mode/super_capacitor_mode/top_spin_mode/follow_gimbal_state
  *          整数编码翻译为对应的底盘枚举模式，供后续控制逻辑分支使用。
+ * @note【已停用】机器人加装机械臂后不再支持小陀螺与“掉头至正位”，
+ *       本函数中 top_spin_mode / follow_gimbal_state 的解析已注释，
+ *       对应状态恒为 TOP_SPIN_MODE_OFF / CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL。
  */
 static void Chassis_ParseOperatingMode(chassis_control_t *chassis_control_state)
 {
@@ -294,7 +306,10 @@ static void Chassis_ParseOperatingMode(chassis_control_t *chassis_control_state)
 		{
 				chassis_control_state->super_capacitor_mode=SUPER_CAPACITOR_MODE_ON;
 		}
-		/*陀螺模式*/
+		/* 陀螺模式（小陀螺）
+		   【已停用】机器人加装机械臂后不再支持小陀螺模式：云台侧遥控器解析已注释，
+		   0x307 报文的陀螺位恒为 0；底盘侧解析同样注释，top_spin_mode 恒为 TOP_SPIN_MODE_OFF。
+		   如需恢复，取消下面一段注释，并恢复 can_user.c 中 CAN_ParseGimbalCommand 的解析。
 		if(chassis_control_state->gimbal_command_data_pointer->top_spin_mode==0)
 		{
 				chassis_control_state->top_spin_mode=TOP_SPIN_MODE_OFF;
@@ -303,7 +318,15 @@ static void Chassis_ParseOperatingMode(chassis_control_t *chassis_control_state)
 		{
 				chassis_control_state->top_spin_mode=TOP_SPIN_MODE_ON;
 		}
-		/*掉头模式*/
+		*/
+		chassis_control_state->top_spin_mode=TOP_SPIN_MODE_OFF;
+
+		/* 掉头模式（一键掉头至正位）
+		   【已停用】机器人加装机械臂后不再支持该模式：云台侧掉头解析已注释，
+		   0x307 报文的掉头位恒为 0；底盘侧解析同样注释，跟随状态恒为
+		   CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL（previous_state 与 state 始终相同，
+		   不会触发掉头等待/速度反向）。
+		   如需恢复，取消下面一段注释，并恢复 can_user.c 中 CAN_ParseGimbalCommand 的解析。
 		chassis_control_state->follow_gimbal_transition.previous_state=chassis_control_state->follow_gimbal_transition.state;
 		if(chassis_control_state->gimbal_command_data_pointer->follow_gimbal_state==0)
 		{
@@ -313,6 +336,9 @@ static void Chassis_ParseOperatingMode(chassis_control_t *chassis_control_state)
 		{
 			chassis_control_state->follow_gimbal_transition.state=CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND;
 		}
+		*/
+		chassis_control_state->follow_gimbal_transition.previous_state=chassis_control_state->follow_gimbal_transition.state;
+		chassis_control_state->follow_gimbal_transition.state=CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL;
 }
 
 /**
@@ -347,6 +373,8 @@ static void Chassis_UpdateFeedback(chassis_control_t *chassis_control_state)
     {
         return;
     }
+	/* 【说明】掉头模式已停用，跟随状态恒为 CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL，
+	   云台相对角恒以 gimbal_yaw_zero_encoder_count 为零位解算。 */
 	if(chassis_control_state->follow_gimbal_transition.state==CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL)
 	{   
 		if(chassis_control_state->gimbal_yaw_motor_measurement_pointer->encoder_count==0)
@@ -356,10 +384,13 @@ static void Chassis_UpdateFeedback(chassis_control_t *chassis_control_state)
 		}
 		chassis_control_state->gimbal_relative_angle_radian=Chassis_ConvertEncoderCountToAngleRadian(chassis_control_state->gimbal_yaw_motor_measurement_pointer->encoder_count,gimbal_yaw_zero_encoder_count);
 	}
+	/* 【已停用】一键掉头至正位：掉头状态下的云台相对角零位
+	   （gimbal_yaw_turnaround_encoder_count）不再使用，此分支整段注释保留备查。
 	else if(chassis_control_state->follow_gimbal_transition.state==CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND)
 	{
 	    chassis_control_state->gimbal_relative_angle_radian=Chassis_ConvertEncoderCountToAngleRadian(chassis_control_state->gimbal_yaw_motor_measurement_pointer->encoder_count,gimbal_yaw_turnaround_encoder_count);
 	}
+	*/
     for(int i=0;i<4;i++)
     {	
         chassis_control_state->motor_states[i].rotor_speed_revolution_per_minute = chassis_control_state->motor_states[i].motor_measurement_pointer->rotor_speed_revolution_per_minute;
@@ -490,8 +521,14 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
 	 	  Chassis_ConvertRemoteControlToSpeed(chassis_control_state);  //遥控器通道计算
 	 }
    
+    /* 【已停用】小陀螺模式（TOP_SPIN_MODE_ON）
+       ----------------------------------------------------------------
+       机器人加装机械臂后无法再支持小陀螺：底盘模式解析中陀螺位恒为 OFF
+       （见 Chassis_ParseOperatingMode），下面的 TOP_SPIN_MODE_ON 分支不会进入，
+       原“按超电状态 + 陀螺方向给定自旋速度”的逻辑整段注释保留备查。 */
     if(chassis_control_state->top_spin_mode == TOP_SPIN_MODE_ON)
     {
+        /* 原小陀螺自旋速度给定（已停用）：
         if(chassis_control_state->super_capacitor_mode == SUPER_CAPACITOR_MODE_ON)
         {
             chassis_control_state->rotation_speed_normal_radian_per_second=chassis_rotation_speed_maximum_super_capacitor_on_revolution_per_minute;
@@ -508,11 +545,15 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
         {
             chassis_control_state->rotation_speed_normal_radian_per_second = -chassis_control_state->rotation_speed_normal_radian_per_second;
         }
+        */
     }
     else if(chassis_control_state->top_spin_mode == TOP_SPIN_MODE_OFF)
     {   
 		if(chassis_control_state->operating_mode==CHASSIS_OPERATING_MODE_FOLLOW_GIMBAL)
         {
+            /* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+               原“检测掉头切换 -> 等待云台完成掉头（期间自旋置 0）-> 恢复跟随”的
+               整段逻辑注释，底盘始终按云台相对角 PID 跟随。
 			if(chassis_control_state->follow_gimbal_transition.state!=chassis_control_state->follow_gimbal_transition.previous_state)
 			{
 				chassis_control_state->follow_gimbal_transition.chassis_response_pending=1;
@@ -522,7 +563,6 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
 				if(chassis_control_state->follow_gimbal_transition.gimbal_turnaround_elapsed_time_millisecond<=gimbal_turnaround_wait_time_millisecond/2)
 				{
 					chassis_control_state->follow_gimbal_transition.gimbal_turnaround_elapsed_time_millisecond+=1;
-					
 				}
 				else
 				{
@@ -533,8 +573,9 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
 			else
 			{
 				chassis_control_state->rotation_speed_normal_radian_per_second=pid_calc(&chassis_control_state->follow_gimbal_angle_loop_pid,chassis_control_state->gimbal_relative_angle_radian,chassis_control_state->gimbal_relative_angle_setpoint_radian);
-			}	
-			
+			}
+            */
+            chassis_control_state->rotation_speed_normal_radian_per_second=pid_calc(&chassis_control_state->follow_gimbal_angle_loop_pid,chassis_control_state->gimbal_relative_angle_radian,chassis_control_state->gimbal_relative_angle_setpoint_radian);
         }
         else if(CHASSIS_OPERATING_MODE_INDEPENDENT)
         {
@@ -544,11 +585,15 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
     chassis_control_state->forward_speed_setpoint_revolution_per_minute=chassis_control_state->forward_speed_normal_revolution_per_minute+chassis_control_state->forward_speed_increment_revolution_per_minute;
     chassis_control_state->leftward_speed_setpoint_revolution_per_minute=chassis_control_state->leftward_speed_normal_revolution_per_minute+chassis_control_state->leftward_speed_increment_revolution_per_minute;
     chassis_control_state->rotation_speed_setpoint_radian_per_second=chassis_control_state->rotation_speed_normal_radian_per_second+chassis_control_state->rotation_speed_increment_radian_per_second;
+	/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+	   follow_gimbal_transition.state 恒为 CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL，
+	   掉头时把平移速度取反的分支不会进入，整段注释保留备查。
 	if(chassis_control_state->follow_gimbal_transition.state==CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND)
 	{
 		chassis_control_state->forward_speed_setpoint_revolution_per_minute=-chassis_control_state->forward_speed_setpoint_revolution_per_minute;
 		chassis_control_state->leftward_speed_setpoint_revolution_per_minute=-chassis_control_state->leftward_speed_setpoint_revolution_per_minute;
 	}
+	*/
     if(chassis_control_state->operating_mode==CHASSIS_OPERATING_MODE_FOLLOW_GIMBAL)
     {  
 		    gimbal_relative_angle_cosine=cos(chassis_control_state->gimbal_relative_angle_radian);
@@ -558,6 +603,8 @@ static void Chassis_CalculateSpeedSetpoint(chassis_control_t *chassis_control_st
 			chassis_control_state->forward_speed_setpoint_revolution_per_minute = forward_speed_revolution_per_minute*gimbal_relative_angle_cosine + leftward_speed_revolution_per_minute*gimbal_relative_angle_sine;//跟随相对平滑处理
 			chassis_control_state->leftward_speed_setpoint_revolution_per_minute = -forward_speed_revolution_per_minute*gimbal_relative_angle_sine + leftward_speed_revolution_per_minute*gimbal_relative_angle_cosine;
 	}
+	/* 【说明】小陀螺模式已停用，top_spin_mode 恒为 TOP_SPIN_MODE_OFF，
+	   因此下面“大自旋时按 0.8 系数降低前进速度”的限速逻辑始终生效（保持原行为）。 */
 	if(chassis_control_state->top_spin_mode==TOP_SPIN_MODE_OFF)
 	{
 		if(fabsf(chassis_control_state->rotation_speed_setpoint_radian_per_second)>800)

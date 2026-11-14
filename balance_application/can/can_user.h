@@ -85,9 +85,9 @@ typedef struct
 	uint8_t leftward_key_value;       //两位 Y_key
 	uint8_t operating_mode;     //两位 底盘模式
 	uint8_t super_capacitor_mode;         //一位 超电
-	uint8_t top_spin_mode;         //一位 小陀螺
-	uint8_t follow_gimbal_state;      //一位 一键掉头使用
-	uint8_t previous_follow_gimbal_state; //一位 一键掉头使用
+	uint8_t top_spin_mode;         //一位 小陀螺（【已停用】加装机械臂后不再支持，恒为 0）
+	uint8_t follow_gimbal_state;      //一位 一键掉头使用（【已停用】加装机械臂后不再支持，恒为 0）
+	uint8_t previous_follow_gimbal_state; //一位 一键掉头使用（【已停用】加装机械臂后不再支持，恒为 0）
 	uint8_t keyboard_control_enabled;      //使用键盘控制进入比赛模式
 	
 }gimbal_command_data_t;

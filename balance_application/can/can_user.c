@@ -21,9 +21,15 @@ static void CAN_ParseGimbalCommand(gimbal_command_data_t *command, const uint8_t
     command->leftward_key_value = (uint8_t)((payload[4] >> 4) & 0x03U);
     command->operating_mode = (uint8_t)((payload[5] >> 6) & 0x03U);
     command->super_capacitor_mode = (uint8_t)((payload[5] >> 5) & 0x01U);
+    /* 【已停用】小陀螺 / 一键掉头至正位：机器人加装机械臂后不再支持这两种模式，
+       云台侧对应遥控器解析已注释（0x307 报文这两位恒为 0），底盘侧同样不再解析；
+       gimbal_command 由静态零初始化保证 top_spin_mode / follow_gimbal_state /
+       previous_follow_gimbal_state 恒为 0（陀螺关、正常跟随方向）。
+       如需恢复，取消下面三行注释，并恢复云台侧遥控器解析与 chassis_task.c 的模式解析。
     command->top_spin_mode = (uint8_t)((payload[5] >> 4) & 0x01U);
     command->follow_gimbal_state = (uint8_t)((payload[5] >> 3) & 0x01U);
     command->previous_follow_gimbal_state = (uint8_t)((payload[5] >> 2) & 0x01U);
+    */
     command->keyboard_control_enabled = (uint8_t)((payload[5] >> 1) & 0x01U);
 }
 

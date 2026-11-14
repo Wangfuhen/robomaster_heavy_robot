@@ -58,22 +58,27 @@ typedef enum
     SUPER_CAPACITOR_MODE_ON,
 } super_capacitor_mode_e;
 
+/* 【已停用】小陀螺模式：机器人加装机械臂后不再支持，top_spin_mode 恒为 TOP_SPIN_MODE_OFF，
+   TOP_SPIN_MODE_ON 仅为保留枚举与 CAN 协议位而存在，运行中不会再被使用。 */
 typedef enum
 {
-	TOP_SPIN_MODE_OFF,
-	TOP_SPIN_MODE_ON,
+	TOP_SPIN_MODE_OFF,   //小陀螺关闭（当前恒为该值）
+	TOP_SPIN_MODE_ON,    //小陀螺开启（【已停用】加装机械臂后不再支持）
 } top_spin_mode_e;
 
+/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+   CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND 运行中不会再被使用，状态恒为 NORMAL。 */
 typedef enum
 {
-    CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL,  //普通跟随方向
-    CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND,
+    CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL,  //普通跟随方向（当前恒为该值）
+    CHASSIS_FOLLOW_GIMBAL_STATE_TURNAROUND,  //掉头（【已停用】加装机械臂后不再支持）
 }chassis_follow_gimbal_state_e;
 
+/* 【已停用】小陀螺旋转方向：随小陀螺模式一并停用，当前不再被使用（保留定义备查）。 */
 typedef enum
 {
-    CHASSIS_TOP_SPIN_DIRECTION_COUNTERCLOCKWISE,            //逆时针小陀螺
-    CHASSIS_TOP_SPIN_DIRECTION_CLOCKWISE,
+    CHASSIS_TOP_SPIN_DIRECTION_COUNTERCLOCKWISE,            //逆时针小陀螺（【已停用】）
+    CHASSIS_TOP_SPIN_DIRECTION_CLOCKWISE,                   //顺时针小陀螺（【已停用】）
 }chassis_top_direction_e;
 
 typedef struct
@@ -91,6 +96,9 @@ typedef struct
 	fp32 mechanical_power_limit_watt;               //单个电机所能得到功率
 }chassis_motor_state_t;
 
+/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+   state / previous_state 恒为 CHASSIS_FOLLOW_GIMBAL_STATE_NORMAL，
+   掉头计时与等待标志不再使用（chassis_task.c 中相关逻辑已注释）。 */
 typedef struct
 {
 	chassis_follow_gimbal_state_e state;
@@ -125,9 +133,9 @@ typedef struct
     chassis_operating_mode_e operating_mode;
     chassis_operating_mode_e previous_operating_mode;
     super_capacitor_mode_e super_capacitor_mode;
-    top_spin_mode_e top_spin_mode;
-    chassis_follow_gimbal_state_e follow_gimbal_state;
-    chassis_top_direction_e top_spin_direction;
+    top_spin_mode_e top_spin_mode;    //小陀螺模式（【已停用】恒为 TOP_SPIN_MODE_OFF）
+    chassis_follow_gimbal_state_e follow_gimbal_state;  //云台跟随状态（【已停用】未使用，恒为 NORMAL）
+    chassis_top_direction_e top_spin_direction;  //小陀螺方向（【已停用】未使用）
     
     lpf_t forward_speed_command_low_pass_filter;  //底盘x速度低通
     lpf_t leftward_speed_command_low_pass_filter;  //底盘y速度低通
@@ -168,7 +176,7 @@ typedef struct
     fp32 leftward_action_gain;  //y方向动作占比
     fp32 rotation_action_gain;  //z方向动作占比
 	
-	int16_t gimbal_turnaround_elapsed_time_millisecond;  //一键掉头时间
+	int16_t gimbal_turnaround_elapsed_time_millisecond;  //一键掉头时间（【已停用】掉头模式停用后不再使用）
 	
 	fp32 forward_speed_slope_acceleration;
 	fp32 forward_speed_slope_rate;

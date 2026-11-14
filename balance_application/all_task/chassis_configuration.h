@@ -33,6 +33,9 @@ static const uint8_t keyboard_backward_key_mask = (uint8_t)(1U << 1);
 static const uint8_t keyboard_rightward_key_mask = (uint8_t)(1U << 0);
 static const uint8_t keyboard_leftward_key_mask = (uint8_t)(1U << 1);
 static const uint8_t super_capacitor_key = KEY_PRESSED_OFFSET_SHIFT;
+/* 【已停用】小陀螺开关键：机器人加装机械臂后不再支持小陀螺模式，
+   对应遥控器解析已注释（云台侧 chassis_data_task.c 与底盘侧 CAN_ParseGimbalCommand），
+   此常量当前无引用，仅保留备查。 */
 static const uint8_t top_spin_key = KEY_PRESSED_OFFSET_C;
 
 /* 麦轮运动学 */
@@ -43,6 +46,7 @@ static const float motor_distance_to_chassis_center_meter = 0.364f;
 
 /* 云台跟随 */
 static const float chassis_follow_gimbal_angle_normal_radian = 0.0f;
+/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，掉头角度设定不再使用 */
 static const float chassis_follow_gimbal_angle_turnaround_radian = 0.0f;
 static const float chassis_follow_gimbal_forward_proportional_gain = 0.07f;
 
@@ -107,6 +111,9 @@ static const float chassis_rotation_speed_acceleration_rate = 5.5f;
 static const float chassis_rotation_speed_deceleration_rate = 1.5f;
 
 /* 云台掉头 */
+/* 【已停用】一键掉头至正位：机器人加装机械臂后不再支持该模式，
+   下面掉头等待时间与掉头零位编码器值仅在恢复掉头逻辑时才会用到，当前无引用；
+   gimbal_yaw_zero_encoder_count 仍是正常跟随方向使用的云台零位，保持不变。 */
 static const uint32_t gimbal_turnaround_wait_time_millisecond = 1600U;
 static const uint16_t gimbal_yaw_zero_encoder_count = 16190U;
 static const uint16_t gimbal_yaw_turnaround_encoder_count = 48929U;

@@ -428,7 +428,7 @@ typedef __packed struct Client_Slave_Flag
 {
     uint8_t global_fiction;
     uint8_t global_clip;
-    uint8_t global_spin;
+    uint8_t global_spin;              //小陀螺（【已停用】加装机械臂后不再支持，UI 侧未使用）
     uint8_t global_auto_aim;
     uint8_t global_twist;
     uint8_t global_anti_top;

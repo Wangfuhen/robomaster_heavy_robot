@@ -13,7 +13,7 @@ static uint8_t sbus_rx_buffer[2][SBUS_RX_BUF_NUM];  //缓冲数组
 
 void dt7_remote_read_init(void)
 {
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, sbus_rx_buffer[0], SBUS_RX_BUF_NUM);  //双缓冲加载
+    Double_dma_init(&huart3,&hdma_usart3_rx,sbus_rx_buffer[0],sbus_rx_buffer[1],RC_FRAME_LENGTH);  //双缓冲加载
 }
 
 
@@ -22,13 +22,79 @@ const RC_ctrl_t *get_dt7_remote_control_point(void)
     return &dt7;
 }
 
-void dt7_remote_on_rx_event(uint16_t Size)
+//串口中断
+void USART3_IRQHandler(void)
 {
-    if(Size == RC_FRAME_LENGTH)
+    if(huart3.Instance->SR & UART_FLAG_RXNE)//接收到数据
     {
-        solve_dt7_data(sbus_rx_buffer[0], &dt7);
+        __HAL_UART_CLEAR_PEFLAG(&huart3);
     }
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart3, sbus_rx_buffer[0], SBUS_RX_BUF_NUM);
+    else if(USART3->SR & UART_FLAG_IDLE)
+    {
+        static uint16_t this_time_rx_len = 0;
+
+        __HAL_UART_CLEAR_PEFLAG(&huart3);
+
+        if ((hdma_usart3_rx.Instance->CR & DMA_SxCR_CT) == RESET)
+        {
+            /* Current memory buffer used is Memory 0 */
+    
+            //disable DMA
+            //失效DMA
+            __HAL_DMA_DISABLE(&hdma_usart3_rx);
+
+            //get receive data length, length = set_data_length - remain_length
+            //获取接收数据长度,长度 = 设定长度 - 剩余长度
+            this_time_rx_len = SBUS_RX_BUF_NUM - hdma_usart3_rx.Instance->NDTR;
+
+            //reset set_data_lenght
+            //重新设定数据长度
+            hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM;
+
+            //set memory buffer 1
+            //设定缓冲区1
+            hdma_usart3_rx.Instance->CR |= DMA_SxCR_CT;
+            
+            //enable DMA
+            //使能DMA
+            __HAL_DMA_ENABLE(&hdma_usart3_rx);
+
+            if(this_time_rx_len == RC_FRAME_LENGTH)  //接收到一帧数据后解码
+            {
+                solve_dt7_data(sbus_rx_buffer[0], &dt7);
+            }
+        }
+        else
+        {
+            /* Current memory buffer used is Memory 1 */
+            //disable DMA
+            //失效DMA
+            __HAL_DMA_DISABLE(&hdma_usart3_rx);
+
+            //get receive data length, length = set_data_length - remain_length
+            //获取接收数据长度,长度 = 设定长度 - 剩余长度
+            this_time_rx_len = SBUS_RX_BUF_NUM - hdma_usart3_rx.Instance->NDTR; //不定长数据接收
+
+            //reset set_data_lenght
+            //重新设定数据长度
+            hdma_usart3_rx.Instance->NDTR = SBUS_RX_BUF_NUM;
+
+            //set memory buffer 0
+            //设定缓冲区0
+            DMA1_Stream1->CR &= ~(DMA_SxCR_CT);
+            
+            //enable DMA
+            //使能DMA
+            __HAL_DMA_ENABLE(&hdma_usart3_rx);
+
+            if(this_time_rx_len == RC_FRAME_LENGTH)
+            {
+                //处理遥控器数据
+                solve_dt7_data(sbus_rx_buffer[1], &dt7);
+            }
+			
+        }
+    }
 }
 
 static void  solve_dt7_data(volatile const uint8_t *sbus, RC_ctrl_t *dt7)

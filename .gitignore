@@ -1,0 +1,14 @@
+# Keil / MDK 构建输出（底盘工程）
+MDK-ARM/25_mini_chassis/
+*.uvguix.*
+*.o
+*.d
+*.crf
+*.dep
+*.axf
+*.hex
+*.map
+*.lst
+*.lnp
+*.build_log.htm
+JLinkLog.txt

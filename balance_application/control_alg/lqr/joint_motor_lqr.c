@@ -1,5 +1,4 @@
 #include "joint_motor_lqr.h"
-#include "user_lib.h"
 /**
   ************************************* Copyright ******************************
   *

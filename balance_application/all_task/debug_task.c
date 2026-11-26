@@ -1,41 +1,44 @@
 #include "debug_task.h"
 #include "ins_task.h"
-#include "cmsis_os2.h"
-#include <string.h>
-extern void Chassis_Task_Report_Update(void);
-/**
- * @brief   debug_task.c —— 调试数据上传任务（VOFA+ 上位机示波器）
- *
- * 职责：把 yaw/pitch/roll 等状态量打包，通过 USART 发送到 VOFA+ 上位机实时曲线显示，
- *       便于联调观察姿态/控制量。
- */
+#include "can_user.h"
+#include "vofa.h"
+#include "chassis_task.h"
+
+
 extern UART_HandleTypeDef huart1;
 extern DMA_HandleTypeDef hdma_usart6_tx;
 extern fp32 yaw;
-extern fp32  pitch;
+extern fp32 pitch;
 extern fp32 roll;
+extern fp32 motor_chassis[4];
+extern chassis_control_t hero_chassis;
+
 const fp32 *send_data[CH_COUNT];
 fp32  a=0;
-/**
- * @brief   调试上传任务（CMSIS-RTOS2 线程入口）
- * @param   argument  CMSIS-RTOS2 线程参数（未使用）
- * @note    每 10ms 调用一次 debug_to_vofa，把 yaw/pitch/roll/计数 a 四路数据上传，
- *          等效采样率 100Hz（见 osDelay(10) 与注释“频率100hz”）。
- */
-void Crg_test_Task(void *argument)
+
+
+void Crg_test_Task(void const * argument)
 {
-	const fp32 *send_data[CH_COUNT] =
-	{
-		&yaw,
-		&pitch,
-		&roll,
-		&a
-	};
-	while(1)
-	{
-		Chassis_Task_Report_Update();
-		debug_to_vofa(send_data,CH_COUNT);
-		a+=1.0f;
-		osDelay(10); //发送频率100hz
-	}
+    (void)argument;
+
+    // VOFA 四个通道依次对应：
+    // CH0：云台相对底盘的实际角度
+    // CH1：云台相对底盘的目标角度
+    // CH2：底盘最终旋转速度设定值
+    // CH3：底盘 Z 轴陀螺仪角速度
+
+    const fp32 *send_data[CH_COUNT] =
+    {
+        &hero_chassis.relative_angle,
+        &hero_chassis.set_relative_angle,
+        &hero_chassis.wz_set,
+        &hero_chassis.chassis_gyro
+    };
+
+    while (1)
+    {
+        debug_to_vofa(send_data, CH_COUNT);
+
+        vTaskDelay(10);
+    }
 }

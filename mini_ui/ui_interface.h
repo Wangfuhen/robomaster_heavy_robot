@@ -8,14 +8,14 @@
 #include <stdio.h>
 #include "ui_types.h"
 #include "main.h"
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 extern int ui_self_id;
 extern UART_HandleTypeDef huart6;
 void print_message(const uint8_t* message, int length);
 
 #define SEND_MESSAGE(message, length) \
 (HAL_UART_Transmit(&huart6,message,length,100)); \
-osDelay(20);
+vTaskDelay(20);
 
 void ui_proc_1_frame(ui_1_frame_t *msg);
 void ui_proc_2_frame(ui_2_frame_t *msg);

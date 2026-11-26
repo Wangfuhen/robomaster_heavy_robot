@@ -1,5 +1,5 @@
 #include "usb_task.h"
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 #include "usbd_cdc_if.h"
 #include "ins_task.h"
 #include "gimbal_task.h"
@@ -13,10 +13,10 @@ static uint8_t send_data[16];
 static void Usb_Send_Data(void);
 uint8_t aim_auto=0;
  
- void Usb_Task(void *argument)
+ void Usb_Task(void const * argument)
  {
 	MX_USB_DEVICE_Init();  //usb初始化
-	osDelay(500);
+	vTaskDelay(500);
 	while(1)
 	{
 		if(gimbal_can_get.robot_id==3)
@@ -28,7 +28,7 @@ uint8_t aim_auto=0;
 			aim_auto=0;
 		}
 		Usb_Send_Data();
-		osDelay(1);
+		vTaskDelay(1);
 	}
  }
  

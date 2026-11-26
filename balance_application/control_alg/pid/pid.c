@@ -78,9 +78,9 @@ fp32 pid_calc(pid_type_def *user_pid,fp32 feed_back,fp32 set) //½øĞĞpid¼ÆËã pid½
         {
             user_pid->pout=user_pid->kp*(user_pid->error[0]-user_pid->error[1]); //Î»ÖÃd
             user_pid->iout=user_pid->ki*user_pid->error[0];  //Î»ÖÃp
-						user_pid->dbuf[2]=user_pid->dbuf[1];
-						user_pid->dbuf[1]=user_pid->dbuf[0];
-						user_pid->dbuf[0]=(user_pid->error[0]-2*user_pid->error[1]+user_pid->error[2]);
+			user_pid->dbuf[2]=user_pid->dbuf[1];
+			user_pid->dbuf[1]=user_pid->dbuf[0];
+			user_pid->dbuf[0]=(user_pid->error[0]-2*user_pid->error[1]+user_pid->error[2]);
             user_pid->dout=user_pid->kd*user_pid->dbuf[0];  //Îó²îÎ¢·Ö
             user_pid->out+=(user_pid->pout+user_pid->iout+user_pid->dout);
             LimitMax(user_pid->out,user_pid->max_out);  //Êä³öÏŞ·ù
@@ -136,5 +136,4 @@ fp32 pid_calc_gimbal(pid_type_def *user_pid,fp32 feed_back,fp32 set)
             LimitMax(user_pid->out,user_pid->max_out);  //Êä³öÏŞ·ù
         }		
     }	
-    return user_pid->out;
 }

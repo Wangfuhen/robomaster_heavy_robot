@@ -31,6 +31,6 @@
   * @param[in]      pvParameters: NULL
   * @retval         none
   */
-extern void referee_usart_task(void *argument);
+extern void referee_usart_task(void const * argument);
 extern float limit_to_C;
 #endif

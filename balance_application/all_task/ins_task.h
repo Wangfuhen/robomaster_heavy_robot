@@ -26,7 +26,7 @@
 #include "c_data_typedef.h"
 #include "ist8310driver.h"
 #include "BMI088driver.h"
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 
 extern fp32 ist8310_data[3];
 
@@ -58,7 +58,6 @@ extern fp32 ist8310_data[3];
 
 
 #define INS_TASK_INIT_TIME 7 //任务开始初期 delay 一段时间
-#define INS_TASK_NOTIFY_FLAG 1   //IMU任务线程通知标志位(CMSIS-RTOS2线程标志)
 
 #define INS_YAW_ADDRESS_OFFSET    0
 #define INS_PITCH_ADDRESS_OFFSET  1
@@ -86,7 +85,7 @@ extern fp32 ist8310_data[3];
   * @param[in]      pvParameters: NULL
   * @retval         none
   */
-extern void INS_task(void *pvParameters);
+extern void INS_task(void const *pvParameters);
 
 /**
   * @brief          calculate gyro zero drift

@@ -1,7 +1,7 @@
 #include "ui_task.h"
 #include "referee_usart_task.h"
 #include "main.h"
-#include "cmsis_os2.h"
+#include "cmsis_os.h"
 #include "bsp_usart.h"
 #include "CRC8_CRC16.h"
 #include "protocol.h"
@@ -13,25 +13,7 @@
 #include "arm_math.h"
 #include "chassis_task.h"
 #include "ui_interface.h"
-/**
- * @brief   ui_task.c —— 裁判系统 UI（客户端交互图形）上传任务
- *
- * 职责：通过裁判系统串口协议，把超级电容电量等状态绘制成图形（线段/矩形/字符/浮点）
- *       上传到客户端界面显示。本质是往 USART6 发一串符合裁判系统“交互数据”协议的帧。
- *
- * 绘制内容：超级电容电压条（按剩余量分段变色：绿/粉/橙/品红，低电量警示），
- *           以及超级电容数值框（FLOAT 浮点显示 voltage_volt，单位 V）。
- *
- * 任务节奏（Ui_Task，每周期 1ms）：
- *   - i%100==0  ：每 100ms 刷新一次“框架”图（RECTANGLE 静态框）；
- *   - i%20==0   ：每 20ms 刷新一次“数值条”图（LINE 动态条）；
- *   - 其余时间只做标志更新，避免占用过多串口带宽。
- *
- * 关键协议点：
- *   - 帧 = 帧头(含长度) + CRC8 + 命令码 + 数据段头 + 图形数据 + CRC16；
- *   - 发送 ID = 本机 robot_id，接收 ID 由 mini_ui_flag_updata 按 robot_id 查表映射。
- */
-extern super_capacitor_measurement_t super_capacitor_measurement;
+extern super_cap_t super_cap;
 
 /*功能函数区*/
 //画字符
@@ -84,35 +66,10 @@ uint16_t Recieve_id;
 fp32 global_supercapacitor_remain = 0;//[0,100]
 uint32_t global_supercapacitor_point = 50;
 /*用户使用区*/
-/**
- * @brief   mini_ui 初始化（预留接口，当前为空实现）
- * @param   None
- */
 static void mini_ui_init(void);
-/**
- * @brief   更新 UI 需要的映射与状态（运行在任务上下文）
- * @note    按裁判系统 robot_id 查表得到“接收端 ID”Recieve_id（用于把图形发给对应机器人），
- *          并同步 ui_self_id 与全局超级电容剩余量 global_supercapacitor_remain（单位 V）。
- */
 static void mini_ui_flag_updata(void);
-/**
- * @brief   绘制超级电容电量条（LINE 线段，按剩余量分段变色）
- * @param   remain_energy  超级电容电压，单位 V（经 25.2V 满量程折算成 0..100 比例）
- * @param   turning_point  低电量警示阈值（百分比）
- * @note    剩余越高越绿，降到不同阈值区间依次变为 粉/橙/品红，提示电量不足；
- *          update_supercapacitor_flag==2 时画动态线段，==1 时画静态矩形框。
- */
 static void supercapacitor_figure(fp32 remain_energy,uint32_t turning_point);
-static /**
- * @brief   组装并发送“超级电容数值”交互图形帧（FLOAT 浮点显示电压）
- * @note    用 FLOAT 图形类型把 super_capacitor_measurement.voltage_volt 数值直接绘制在客户端界面。
- */
-void Float_supercapacitor_update();//超级电容条绘制
-/**
- * @brief   组装并发送“超级电容电量条”交互图形帧
- * @note    依次填充：帧头 -> CRC8 -> 命令码 -> 数据段头(send/receiver id) ->
- *          图形数据(supercapacitor_figure) -> CRC16，最后经 USART6 发出。
- */
+static void Float_supercapacitor_update();//超级电容条绘制
 void Client_supercapacitor_update();//超级电容框架绘制
 ext_graphic_seven_data_t super_data;    //绘制超级电容电压
 //变量 
@@ -122,16 +79,10 @@ uint8_t CliendTxBuffer[200];//真正发送数组
 //结构体
 ext_graphic_one_data_t tx_supercapacitor_figure;//绘制一个图形   超级电容条静态
 /*用户使用区*/
-/**
- * @brief   UI 上传任务主循环（CMSIS-RTOS2 线程入口）
- * @param   argument  CMSIS-RTOS2 线程参数（未使用）
- * @note    以 i 为节拍计数：每 100ms 刷新一次静态框架（ui_init_first_Ungroup + 电容框），
- *          每 20ms 刷新一次动态数值条；中间仅做标志更新，控制串口带宽。
- */
-void Ui_Task(void *argument)
+void Ui_Task(void const * argument)
 {
-	osDelay(10);
-	osDelay(1);
+	vTaskDelay(10);
+	vTaskDelay(1);
 	while(1)
 	{
 		static uint32_t i=0;
@@ -154,7 +105,7 @@ void Ui_Task(void *argument)
 
 			V_cap_flag=1;
 		}
-		osDelay(1);
+		vTaskDelay(1);
 		i++;
 		
 		if(i>1001)
@@ -262,20 +213,11 @@ void Client_Sent_String(uint8_t *string, uint16_t length)
 }
 
 /*用户使用区*/
-/**
- * @brief   mini_ui 初始化（预留接口，当前为空实现）
- * @param   None
- */
 static void mini_ui_init(void)
 {
 
 }
 
-/**
- * @brief   更新 UI 需要的映射与状态（运行在任务上下文）
- * @note    按裁判系统 robot_id 查表得到“接收端 ID”Recieve_id（用于把图形发给对应机器人），
- *          并同步 ui_self_id 与全局超级电容剩余量 global_supercapacitor_remain（单位 V）。
- */
 static void mini_ui_flag_updata(void)
 {
     if(RM_Referee_system.robot_state.robot_id==3)
@@ -295,15 +237,8 @@ static void mini_ui_flag_updata(void)
         Recieve_id = 0x168;
     }
 	ui_self_id=RM_Referee_system.robot_state.robot_id;
-	global_supercapacitor_remain = (super_capacitor_measurement.voltage_volt);
+	global_supercapacitor_remain = (super_cap.V_cap_value);
 }
-/**
- * @brief   绘制超级电容电量条（LINE 线段，按剩余量分段变色）
- * @param   remain_energy  超级电容电压，单位 V（经 25.2V 满量程折算成 0..100 比例）
- * @param   turning_point  低电量警示阈值（百分比）
- * @note    剩余越高越绿，降到不同阈值区间依次变为 粉/橙/品红，提示电量不足；
- *          update_supercapacitor_flag==2 时画动态线段，==1 时画静态矩形框。
- */
 static void supercapacitor_figure(fp32 remain_energy,uint32_t turning_point)//剩余超级电容（单位百分比），低于某百分比变红色
 {
 	 uint32_t remaining = 0,remaining1=0;//强制转换
@@ -330,11 +265,6 @@ static void supercapacitor_figure(fp32 remain_energy,uint32_t turning_point)//剩
 	Figure_Graphic(&tx_supercapacitor_figure.clientData,"SR1",update_supercapacitor_flag,RECTANGLE,5,CYAN_BLUE,0,0,5,(920-280),95,0, (920+280),125);
 }
 
-/**
- * @brief   组装并发送“超级电容电量条”交互图形帧
- * @note    依次填充：帧头 -> CRC8 -> 命令码 -> 数据段头(send/receiver id) ->
- *          图形数据(supercapacitor_figure) -> CRC16，最后经 USART6 发出。
- */
 void Client_supercapacitor_update()//超级电容条绘制
 {
     //帧头
@@ -359,10 +289,6 @@ void Client_supercapacitor_update()//超级电容条绘制
     Client_Sent_String(CliendTxBuffer, sizeof(tx_supercapacitor_figure));
 }
 
-/**
- * @brief   组装并发送“超级电容数值”交互图形帧（FLOAT 浮点显示电压）
- * @note    用 FLOAT 图形类型把 super_capacitor_measurement.voltage_volt 数值直接绘制在客户端界面。
- */
 void Float_supercapacitor_update()//超级电容框绘制
 {
     //帧头
@@ -378,7 +304,7 @@ void Float_supercapacitor_update()//超级电容框绘制
     super_data.dataFrameHeader.send_ID     =  RM_Referee_system.robot_state.robot_id;
     super_data.dataFrameHeader.receiver_ID = Recieve_id;
     //数据段
-	Figure_Graphic(super_data.clientData,"SR1",1,FLOAT,5,CYAN_BLUE,0,0,5,(680),95,0, (680+600),super_capacitor_measurement.voltage_volt);
+	Figure_Graphic(super_data.clientData,"SR1",1,FLOAT,5,CYAN_BLUE,0,0,5,(680),95,0, (680+600),super_cap.V_cap_value);
     memcpy(CliendTxBuffer+LEN_FRAME_HEAD, (uint8_t*)&super_data.CmdID, LEN_CMD_ID+super_data.txFrameHeader.data_length);//加上命令码长度2
 
     //帧尾

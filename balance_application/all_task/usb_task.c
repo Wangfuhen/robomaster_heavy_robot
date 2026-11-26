@@ -5,7 +5,7 @@
 #include "gimbal_task.h"
 #include "usb_device.h"
 #include "can_user.h"
-extern gimbal_c_get_data_t gimbal_received_data;
+extern gimbal_c_get_data_t gimbal_can_get;
 autom_pc hero_pc={0};
 static const fp32 *gimbal_INT_gyro_angle_point;
 static const fp32 *gimbal_INT_q_point;

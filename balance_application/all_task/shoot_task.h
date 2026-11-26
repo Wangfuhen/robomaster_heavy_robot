@@ -167,7 +167,7 @@ typedef struct
  */
 typedef struct
 {
-    const motor_measurement_t *shoot_motor_measure;  // 电机测量数据指针
+    const motor_measure_t *shoot_motor_measure;  // 电机测量数据指针
     pid_type_def pid_shoot_speed;                // 速度环PID控制器
     lqr_type_def lqr;                            // LQR控制器（预留）
     fp32 speed_set;                              // 目标转速（RPM）
@@ -182,7 +182,7 @@ typedef struct
  */
 typedef struct
 {
-    const motor_measurement_t *trigger_motor_measure;  // 电机测量数据指针
+    const motor_measure_t *trigger_motor_measure;  // 电机测量数据指针
     trigger_mode_e trigger_mode;                   // 拨弹盘工作模式
     trigger_block_t tigger_bolck;                  // 堵转检测状态
     

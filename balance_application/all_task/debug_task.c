@@ -14,20 +14,20 @@ void Crg_test_Task(void const * argument)
     int b=0;
 static	fp32 channels[CH_COUNT];
 	const RC_ctrl_t *remote = get_dt7_remote_control_point();
-    const motor_measurement_t *yaw_motor = GetYawAxisMotorMeasurementPointer();
-    const motor_measurement_t *pitch_motor = GetPitchAxisMotorMeasurementPointer();
+    const motor_measure_t *yaw_motor = get_motor_gimbal_yaw_measure_point();
+    const motor_measure_t *pitch_motor = get_motor_gimbal_pitch_measure_point();
     const fp32 *ins_angle = get_INS_angle_point();
     const autom_pc *pc = get_crg_pc_point();
-    const motor_measurement_t *trigger_motor = GetTriggerMotorMeasurementPointer();
+    const motor_measure_t *trigger_motor = get_motor_gimbal_trigger_measure_point();
 	while(1)
 	{
 		ist8310_data[0]=b++;
-		channels[0] = (fp32)yaw_motor->encoder_count;
-        channels[1] = (fp32)pitch_motor->encoder_count;          // pitch encoder count
+		channels[0] = (fp32)yaw_motor->ecd;
+        channels[1] = (fp32)pitch_motor->ecd;          // pitch encoder count
         channels[2] = ins_angle[INS_YAW_ADDRESS_OFFSET] * 57.295779513f;   // yaw IMU angle (deg)
         channels[3] = ins_angle[INS_PITCH_ADDRESS_OFFSET] * 57.295779513f; // pitch IMU angle (deg)
 	    	channels[4] = ins_angle[INS_ROLL_ADDRESS_OFFSET] * 57.295779513f;      // roll (deg)
-	     	channels[5] = (fp32)pitch_motor->rotor_speed_revolution_per_minute;
+	     	channels[5] = (fp32)pitch_motor->speed_rpm;
 	      channels[6] = 
         channels[7] = 
         channels[8] = 0;

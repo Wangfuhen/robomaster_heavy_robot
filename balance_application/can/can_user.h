@@ -37,57 +37,55 @@
 #define chassis_can hcan2
 typedef enum
 {
-    /* gimbal motor feedback */
-    /****    hcan1  äº‘å°ç”µæœº  ****/   
-    CAN1_fire_l_motor_id=0x202,  // ä¸¤ä¸ªæ‘©æ“¦è½®0x200
+    /*gimbal_motor_get*/ 
+    /****    hcan1  ÔÆÌ¨µç»ú  ****/   
+    CAN1_fire_l_motor_id=0x202,  // Á½¸öÄ¦²ÁÂÖ0x200
     CAN1_fire_r_motor_id=0x201,
     CAN1_fire_d_motor_id=0x203,
-	  CAN_MESSAGE_IDENTIFIER_PITCH_AXIS_FEEDBACK=0x205,   //pitchç”µæœº
-       //pitchç”µæœº 0x1ff
+	  CAN1_pitch_motor_id=0x205,   //pitchµç»ú
+       //pitchµç»ú 0x1ff
 	
-    /****  hcan2  åº•ç›˜ç”µæœº  ****/
+    /****  hcan2  µ×ÅÌµç»ú  ****/
     
-    CAN2_yaw_motor_id=0x141,      //yawè½´ç”µæœº
-    CAN2_trigger_motor_id=0x201,//æ‹¨å¼¹ç”µæœº
+    CAN2_yaw_motor_id=0x141,      //yawÖáµç»ú
+    CAN1_trigger_motor_id=0x201,//²¦µ¯µç»ú
 
     /*gimbal_motor_send_flag_id*/
 	//CAN1
     CAN1_shoot_flag_id=0x200,
-    CAN_MESSAGE_IDENTIFIER_PITCH_AXIS_COMMAND=  0x1FF,
+    CAN1_pitch_flag_id=  0x1FF,
     CAN1_trigger_flag_id=0x200,
 	
 	//CAN2
     CAN2_yaw_flag_id=    0x141,
 
     /*other_msg_id*/
-    CAN2_send_chassis_msg    =  0x307,    //CAN2å‘é€åº•ç›˜  0X307
-	CAN2_recive_chassis_msg  =  0X308,    //åº•ç›˜æ¥æ”¶ä¿¡æ¯ 0x308
+    CAN2_send_chassis_msg    =  0x307,    //CAN2·¢ËÍµ×ÅÌ  0X307
+	CAN2_recive_chassis_msg  =  0X308,    //µ×ÅÌ½ÓÊÕĞÅÏ¢ 0x308
 	CAN2_SEND_REMOTE_TO_CHASSIS = 0x401,
 
-}can_message_identifier_t;
+}can_msg_id;
 
 typedef struct 
 {
-    uint16_t encoder_count;           //ç¼–ç å™¨æœºæ¢°æ•°å€¼
-    int16_t rotor_speed_revolution_per_minute;      //è½¬å­è½¬åŠ¨é€Ÿåº¦ æ¯åˆ†é’Ÿè½¬
-    int16_t measured_torque_current_count;  //è½¬å­è½¬çŸ©ç”µæµ
-    uint8_t motor_temperature_degree_celsius;      //è½¬å­æ¸©åº¦
-    uint8_t controller_error_code;                  // C620 DATA[7] é”™è¯¯ç 
-    uint32_t last_update_time_millisecond;          // æœ€è¿‘ä¸€æ¬¡æ”¶åˆ°åé¦ˆçš„æ—¶é—´
-    int16_t previous_encoder_count;       //ä¸Šä¸€æ¬¡ç¼–ç å™¨å€¼
-    int16_t encoder_count_difference;      //å¢é‡
-    int16_t revolution_count;          //è½¬çš„åœˆæ•°
-}motor_measurement_t;
+    uint16_t ecd;           //±àÂëÆ÷»úĞµÊıÖµ
+    int16_t speed_rpm;      //×ª×Ó×ª¶¯ËÙ¶È Ã¿·ÖÖÓ×ª
+    int16_t given_current;  //×ª×Ó×ª¾ØµçÁ÷
+    uint8_t temperate;      //×ª×ÓÎÂ¶È
+    int16_t last_ecd;       //ÉÏÒ»´Î±àÂëÆ÷Öµ
+    int16_t delta_ecd;      //ÔöÁ¿
+    int16_t round;          //×ªµÄÈ¦Êı
+}motor_measure_t;
 
 typedef struct can_user
 {
-    uint16_t rm_limit_power;                     //åº•ç›˜åŠŸç‡ä¸Šé™
-    uint16_t rm_buffer_energy;                   //ç¼“å†²èƒ½é‡
-	uint16_t shooter_42mm_1_barrel_heat;         //42æ¯«ç±³æªç®¡çƒ­é‡
-	uint8_t  robot_id;                           //æœºå™¨äººID
-	uint16_t shooter_barrel_cooling_value;       //æœºå™¨äººæªå£çƒ­é‡æ¯ç§’å†·å´å€¼ 
-	uint16_t shooter_barrel_heat_limit;          //æœºå™¨äººæªå£çƒ­é‡ä¸Šé™
-	uint8_t V_cap_value;                         //ç”µå®¹ç”µå‹
+    uint16_t rm_limit_power;                     //µ×ÅÌ¹¦ÂÊÉÏÏŞ
+    uint16_t rm_buffer_energy;                   //»º³åÄÜÁ¿
+	uint16_t shooter_42mm_1_barrel_heat;         //42ºÁÃ×Ç¹¹ÜÈÈÁ¿
+	uint8_t  robot_id;                           //»úÆ÷ÈËID
+	uint16_t shooter_barrel_cooling_value;       //»úÆ÷ÈËÇ¹¿ÚÈÈÁ¿Ã¿ÃëÀäÈ´Öµ 
+	uint16_t shooter_barrel_heat_limit;          //»úÆ÷ÈËÇ¹¿ÚÈÈÁ¿ÉÏÏŞ
+	uint8_t V_cap_value;                         //µçÈİµçÑ¹
 }super_cap_t;
 
 typedef struct 
@@ -102,33 +100,33 @@ typedef struct
 
 typedef struct 
 {
-	int16_t x_rc_data;        //16ä½ X_rc
-	int16_t y_rc_data;        //16ä½ Y_rc
-	uint8_t x_key_data;       //ä¸¤ä½ X_key
-	uint8_t y_key_data;       //ä¸¤ä½ Y_key
-	uint8_t chassis_mode;     //ä¸¤ä½ åº•ç›˜æ¨¡å¼
-	uint8_t cap_mode;         //ä¸€ä½ è¶…ç”µ
-	uint8_t top_mode;         //ä¸€ä½ å°é™€èºï¼ˆã€å·²åœç”¨ã€‘åŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒï¼Œæ’ä¸º 0ï¼‰
-	uint8_t follow_mode;      //ä¸€ä½ ä¸€é”®æ‰å¤´ä½¿ç”¨ï¼ˆã€å·²åœç”¨ã€‘åŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒï¼Œæ’ä¸º 0ï¼‰
-	uint8_t follow_mode_last; //ä¸€ä½ ä¸€é”®æ‰å¤´ä½¿ç”¨ï¼ˆã€å·²åœç”¨ã€‘åŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒï¼Œæ’ä¸º 0ï¼‰
-	uint8_t key_control;      //ä½¿ç”¨é”®ç›˜æ§åˆ¶è¿›å…¥æ¯”èµ›æ¨¡å¼
+	int16_t x_rc_data;        //16Î» X_rc
+	int16_t y_rc_data;        //16Î» Y_rc
+	uint8_t x_key_data;       //Á½Î» X_key
+	uint8_t y_key_data;       //Á½Î» Y_key
+	uint8_t chassis_mode;     //Á½Î» µ×ÅÌÄ£Ê½
+	uint8_t cap_mode;         //Ò»Î» ³¬µç
+	uint8_t top_mode;         //Ò»Î» Ğ¡ÍÓÂİ
+	uint8_t follow_mode;      //Ò»Î» Ò»¼üµôÍ·Ê¹ÓÃ
+	uint8_t follow_mode_last; //Ò»Î» Ò»¼üµôÍ·Ê¹ÓÃ
+	uint8_t key_control;      //Ê¹ÓÃ¼üÅÌ¿ØÖÆ½øÈë±ÈÈüÄ£Ê½
 }gimbal_c_send_data_t;
 
 
-/* CAN transmit */
+/*CAN_send*/
 extern void CAN_cmd_shoot(int16_t fric_left, int16_t fric_right,int16_t fric_down);             //fire
 extern void CAN_cmd_gimbal_yaw(int16_t yaw);                                  //yaw
-extern void CAN_SendPitchAxisTorqueCurrentCommand(int16_t pitch);		                  //pitch
-extern void CAN_cmd_trigger(int16_t trigger,int16_t encoder_count);                                 //trigger
+extern void CAN_motor_send_data_pitch(int16_t pitch);		                  //pitch
+extern void CAN_cmd_trigger(int16_t trigger,int16_t ecd);                                 //trigger
 extern void CAN_gimbal_send_chassis(gimbal_c_send_data_t *gimbal_send_data);  //gimbal
 /*CAN_recive_point*/
-extern const motor_measurement_t *GetLeftFrictionWheelMotorMeasurementPointer(void);
-extern const motor_measurement_t *GetRightFrictionWheelMotorMeasurementPointer(void);
-extern const motor_measurement_t *GetDownFrictionWheelMotorMeasurementPointer(void);
-extern const motor_measurement_t *GetPitchAxisMotorMeasurementPointer(void);
+extern const motor_measure_t *get_motor_gimbal_fire_left_measure_point(void);
+extern const motor_measure_t *get_motor_gimbal_fire_right_measure_point(void);
+extern const motor_measure_t *get_motor_gimbal_fire_down_measure_point(void);
+extern const motor_measure_t *get_motor_gimbal_pitch_measure_point(void);
 
-extern const motor_measurement_t *GetYawAxisMotorMeasurementPointer(void);
-extern const motor_measurement_t *GetTriggerMotorMeasurementPointer(void);
+extern const motor_measure_t *get_motor_gimbal_yaw_measure_point(void);
+extern const motor_measure_t *get_motor_gimbal_trigger_measure_point(void);
 
 extern const gimbal_c_get_data_t *get_c_rm_data_point(void);
 

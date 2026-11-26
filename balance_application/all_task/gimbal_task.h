@@ -1,8 +1,8 @@
-ï»¿/**
+/**
  * @file gimbal_task.h
- * @brief äº‘å°æ§åˆ¶ä»»åŠ¡å¤´æ–‡ä»¶
- * @note æ­¤æ–‡ä»¶å®šä¹‰äº†äº‘å°æ§åˆ¶çš„æ‰€æœ‰å®å®šä¹‰ã€æšä¸¾ç±»å‹å’Œæ•°æ®ç»“æ„
- *       åŒ…å«äº‘å°æ§åˆ¶å‚æ•°ã€ç”µæœºå‚æ•°ã€PIDå‚æ•°ç­‰
+ * @brief ÔÆÌ¨¿ØÖÆÈÎÎñÍ·ÎÄ¼ş
+ * @note ´ËÎÄ¼ş¶¨ÒåÁËÔÆÌ¨¿ØÖÆµÄËùÓĞºê¶¨Òå¡¢Ã¶¾ÙÀàĞÍºÍÊı¾İ½á¹¹
+ *       °üº¬ÔÆÌ¨¿ØÖÆ²ÎÊı¡¢µç»ú²ÎÊı¡¢PID²ÎÊıµÈ
  */
 
 #ifndef GIMBAL_TASK_H
@@ -48,208 +48,403 @@
 #include "joint_motor_lqr.h"
 #include "cmsis_os.h"
 
-#include "gimbal_configuration.h"
+// ============================ Ê±¼ä³£Á¿ ============================
+#define HERO_GIMBAL_INIT_TIME 100              // ÔÆÌ¨³õÊ¼»¯ÑÓÊ±Ê±¼ä£¨ms£©
+#define GIMBAL_LOOP_TIME      1                // ÔÆÌ¨¿ØÖÆÑ­»·ÖÜÆÚ£¨ms£©
 
-// ============================ YAWè½´æ§åˆ¶å‚æ•°ï¼ˆæ™®é€šæ¨¡å¼ï¼‰ ============================
-// ç¼–ç å™¨è§’åº¦æ§åˆ¶ï¼ˆç›¸å¯¹è§’åº¦ï¼‰
-#define YAW_ANGLE_KP_RELATIVE       60.0f      // è§’åº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_ANGLE_KI_RELATIVE       20.0f      // è§’åº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_ANGLE_KD_RELATIVE       100.0f     // è§’åº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_ANGLE_MAX_RELATIVE      2000.0f    // è§’åº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_ANGLE_I_MAX_RELATIVE    0.5f       // è§’åº¦ç¯ç§¯åˆ†é™å¹…
+// ============================ ÊıÑ§³£Á¿ ============================
+#define MOTOR_ECD_TO_RAD      0.000766990394f  // 6020µç»ú±àÂëÆ÷×ª»¡¶ÈÏµÊı (2*PI/8192)
+#define PI	                  3.14159265358979f // Ô²ÖÜÂÊ
+#define ECD_TO_RAD            0.0000958738f    // 9025µç»ú±àÂëÆ÷×ª»¡¶ÈÏµÊı (2*PI/65536)
 
-// ç¼–ç å™¨é€Ÿåº¦æ§åˆ¶ï¼ˆç›¸å¯¹é€Ÿåº¦ï¼‰
-#define YAW_SPEED_KP_RELATIVE       6000.0f    // é€Ÿåº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_SPEED_KI_RELATIVE       0.0f       // é€Ÿåº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_SPEED_KD_RELATIVE       100.0f     // é€Ÿåº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_SPEED_MAX_RELATIVE      30000.0f   // é€Ÿåº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_SPEED_I_MAX_RELATIVE    200.0f     // é€Ÿåº¦ç¯ç§¯åˆ†é™å¹…
+// ============================ µç»ú²ÎÊı ============================
+#define MOTOR_T_k             0.741            // 6020µç»ú´ø1:19¼õËÙÏäµÄÅ¤¾Ø³£Êı (N¡¤m/A)
+#define MOTOR_MA_TO_A         5461.3333        // 6020µç»úµçÁ÷×ª»»ÏµÊı£¨ºÁ°²×ª°²Åà£©
+#define MOTOR_RPM_RADS        0.1047197533333  // ×ªËÙ×ª½ÇËÙ¶ÈÏµÊı (rad/s) - ËùÓĞµç»úÍ¨ÓÃ
+#define _MOTOR_T_k            0                // 9025µç»ú´ø1:19¼õËÙÏäµÄÅ¤¾Ø³£Êı (N¡¤m/A)£¨´ıÉèÖÃ£©
+#define _MOTOR_MA_TO_A        0                // 9025µç»úµçÁ÷×ª»»ÏµÊı£¨ºÁ°²×ª°²Åà£©£¨´ıÉèÖÃ£©
 
-// ç¼–ç å™¨ç”µæµæ§åˆ¶ï¼ˆç›¸å¯¹æ¨¡å¼ï¼‰
-#define YAW_CURRENT_KP_RELATIVE     0          // ç”µæµç¯æ¯”ä¾‹ç³»æ•°ï¼ˆæœªä½¿ç”¨ï¼‰
-#define YAW_CURRENT_MAX_RELATIVE    30000      // ç”µæµç¯æœ€å¤§è¾“å‡º
+// ============================ ±àÂëÆ÷²ÎÊı ============================
+#define HALF_ECD_RANGE        32768            // °ë±àÂëÆ÷·¶Î§
+#define ECD_RANGE             65536            // ±àÂëÆ÷×Ü·¶Î§
 
-// ============================ YAWè½´æ§åˆ¶å‚æ•°ï¼ˆé™€èºä»ªæ¨¡å¼ï¼‰ ============================
-// é™€èºä»ªè§’åº¦æ§åˆ¶ï¼ˆç»å¯¹è§’åº¦ï¼‰
-#define YAW_ANGLE_KP       20.0f               // è§’åº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_ANGLE_KI       0.0f                // è§’åº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_ANGLE_KD       5.0f                // è§’åº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_ANGLE_MAX      6.0f                // è§’åº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_ANGLE_I_MAX    0.5f                // è§’åº¦ç¯ç§¯åˆ†é™å¹…
+// ============================ ÔÆÌ¨ÁãµãÉèÖÃ ============================
+#define YAW_ZERO_ANGLE_SET    6533             // YAWÖáÁãµãÎ»ÖÃ£¨9025µç»ú£¬´ıÉèÖÃ£©
+#define YAW_CHANGE_ANGLE_SET  0            // YAWÖáµôÍ·ÁãµãÎ»ÖÃ£¨9025µç»ú£¬´ıÉèÖÃ£©
+#define YAW_CHANGE_WAIT_TIME  1600             // µôÍ·µÈ´ıÊ±¼ä£¨¿ØÖÆÖÜÆÚÊı£©
+#define PITCH_ZERO_ANGLE_SET  1891             // PITCHÖáÁãµãÎ»ÖÃ
 
-// é™€èºä»ªé€Ÿåº¦æ§åˆ¶ï¼ˆè§’é€Ÿåº¦ï¼‰
-#define YAW_SPEED_KP       1300.0f             // é€Ÿåº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_SPEED_KI       0.0f                // é€Ÿåº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_SPEED_KD       100.0f              // é€Ÿåº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_SPEED_MAX      30000.0f            // é€Ÿåº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_SPEED_I_MAX    200.0f              // é€Ÿåº¦ç¯ç§¯åˆ†é™å¹…
+// ============================ Ò£¿ØÆ÷²ÎÊı ============================
+// Êó±êÁéÃô¶È
+#define YAW_MOUSE_SEN         0.000008f        // YAWÖáÊó±êÁéÃô¶È
+#define PITCH_MOUSE_SEN       0.000008f        // PITCHÖáÊó±êÁéÃô¶È
 
-// é™€èºä»ªç”µæµæ§åˆ¶
-#define YAW_CURRENT_KP     0                   // ç”µæµç¯æ¯”ä¾‹ç³»æ•°ï¼ˆæœªä½¿ç”¨ï¼‰
-#define YAW_CURRENT_MAX    30000               // ç”µæµç¯æœ€å¤§è¾“å‡º
+// Ò£¿ØÆ÷ÁéÃô¶È
+#define YAW_RC_SEN           -0.000008f        // YAWÖáÒ£¿ØÆ÷ÁéÃô¶È£¨¸ººÅ±íÊ¾·½Ïò£©
+#define PITCH_RC_SEN          0.000004f        // PITCHÖáÒ£¿ØÆ÷ÁéÃô¶È
 
-// ============================ YAWè½´æ§åˆ¶å‚æ•°ï¼ˆè‡ªç„æ¨¡å¼ï¼‰ ============================
-// è‡ªç„è§’åº¦æ§åˆ¶
-#define YAW_ANGLE_KP_AC       20.0f            // è‡ªç„è§’åº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_ANGLE_KI_AC       0.0f             // è‡ªç„è§’åº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_ANGLE_KD_AC       5.0f             // è‡ªç„è§’åº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_ANGLE_AC_MAX      6.0f             // è‡ªç„è§’åº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_ANGLE_I_AC_MAX    0.5f             // è‡ªç„è§’åº¦ç¯ç§¯åˆ†é™å¹…
+// Ò£¿ØÆ÷Í¨µÀ¶¨Òå
+#define YAW_CHANNEL           0                // YAW¿ØÖÆÍ¨µÀ
+#define PITCH_CHANNEL         1                // PITCH¿ØÖÆÍ¨µÀ
 
-// è‡ªç„é€Ÿåº¦æ§åˆ¶
-#define YAW_SPEED_KP_AC       1300.0f          // è‡ªç„é€Ÿåº¦ç¯æ¯”ä¾‹ç³»æ•°
-#define YAW_SPEED_KI_AC       0.0f             // è‡ªç„é€Ÿåº¦ç¯ç§¯åˆ†ç³»æ•°
-#define YAW_SPEED_KD_AC       300.0f           // è‡ªç„é€Ÿåº¦ç¯å¾®åˆ†ç³»æ•°
-#define YAW_SPEED_AC_MAX      30000.0f         // è‡ªç„é€Ÿåº¦ç¯æœ€å¤§è¾“å‡º
-#define YAW_SPEED_I_AC_MAX    200.0f           // è‡ªç„é€Ÿåº¦ç¯ç§¯åˆ†é™å¹…
+// Ò£¿ØÆ÷ËÀÇø
+#define RC_DEADBAND           10               // Ò£¿ØÆ÷Í¨µÀËÀÇøÖµ
 
-// è‡ªç„ç”µæµæ§åˆ¶
-#define YAW_CURRENT_KP_AC     0                // è‡ªç„ç”µæµç¯æ¯”ä¾‹ç³»æ•°ï¼ˆæœªä½¿ç”¨ï¼‰
-#define YAW_CURRENT_AC_MAX    30000            // è‡ªç„ç”µæµç¯æœ€å¤§è¾“å‡º
+// ²¦¸Ë¶¨Òå
+#define LEFT                  1                // ×ó²¦¸Ë
+#define RIGHT                 0                // ÓÒ²¦¸Ë
 
-// ============================ æ•°æ®ç»“æ„å®šä¹‰ ============================
+// ============================ °´¼ü¶¨Òå ============================
+#define CHANGE_GIMBAL_FORWARD KEY_PRESSED_OFFSET_E  // Ò»¼üµôÍ·°´¼ü
+
+// ============================ ÔÆÌ¨½Ç¶ÈÏŞÖÆ ============================
+// PITCHÖáÏà¶Ô½Ç¶ÈÏŞÖÆ£¨±àÂëÆ÷½Ç¶È£©
+#define GIMBAL_PITCH_RELATIVE_MAX_ANGLE   0.1296f     // PITCHÏà¶Ô½Ç¶ÈÉÏÏŞ£¨»¡¶È£©
+#define GIMBAL_PITCH_RELATIVE_MIN_ANGLE  -0.368f      // PITCHÏà¶Ô½Ç¶ÈÏÂÏŞ£¨»¡¶È£©
+
+// PITCHÖá¾ø¶Ô½Ç¶ÈÏŞÖÆ£¨ÍÓÂİÒÇ½Ç¶È£©
+#define GIMBAL_PITCH_ABSOULATE_MAX_ANGLE  0.7f       // PITCH¾ø¶Ô½Ç¶ÈÉÏÏŞ£¨»¡¶È£©
+#define GIMBAL_PITCH_ABSOULATE_MIN_ANGLE -0.2f       // PITCH¾ø¶Ô½Ç¶ÈÏÂÏŞ£¨»¡¶È£©
+/* ==================== PITCH ĞĞ³ÌÏŞÎ»£¨È«Ä£Ê½£© ==================== */
+/* ×÷ÓÃÔÚ×îÖÕµçÁ÷£ºÈÎºÎÄ£Ê½ÏÂ£¬Ö»ÒªÕâÌõµçÁ÷»á°Ñ¸©Ñö¼ÌĞøÍÆÏòÏŞÎ»Íâ£¬¾Í°´¾àÀëÏ÷µô£»
+ * ·´·½ÏòÓÀÔ¶·ÅĞĞ£¬½á¹¹ÉÏ²»»á¿¨ËÀ¡£
+ * ÏŞÎ»½ÇÓë¡°Éè¶¨ÖµÇ¯Î»¡±¹²ÓÃÍ¬Ò»×éºê£¬¸ÄÒ»´¦Á½±ß¶¼ÉúĞ§¡£
+ * ×¢Òâ£ºPITCH_TRAVEL_DIR ±ØĞëÊµ²â±ê¶¨£¨+1 ±íÊ¾ÕıµçÁ÷Ê¹ IMU pitch Ôö´ó£© */
+#define PITCH_TRAVEL_ENABLE        1
+#define PITCH_TRAVEL_MAX_RAD       GIMBAL_PITCH_ABSOULATE_MAX_ANGLE   /* Ì§Í·ÉÏÏŞ£¨IMU pitch£© */
+#define PITCH_TRAVEL_MIN_RAD       GIMBAL_PITCH_ABSOULATE_MIN_ANGLE   /* µÍÍ·ÏÂÏŞ£¨IMU pitch£© */
+#define PITCH_TRAVEL_SOFT_RAD      0.06f      /* ÈíÇø¿í¶È£¬Ô¼ 3.4¡ã */
+#define PITCH_TRAVEL_DIR           (-1)       /* ÊÖ±úÉÏÍÆÊÇµÍÍ·£¬¹ÊÕıµçÁ÷¶ÔÓ¦ pitch ¼õĞ¡ */
+
+// ============================ YAWÖá¿ØÖÆ²ÎÊı£¨ÆÕÍ¨Ä£Ê½£© ============================
+// ±àÂëÆ÷½Ç¶È¿ØÖÆ£¨Ïà¶Ô½Ç¶È£©
+#define YAW_ANGLE_KP_RELATIVE       60.0f      // ½Ç¶È»·±ÈÀıÏµÊı
+#define YAW_ANGLE_KI_RELATIVE       20.0f      // ½Ç¶È»·»ı·ÖÏµÊı
+#define YAW_ANGLE_KD_RELATIVE       100.0f     // ½Ç¶È»·Î¢·ÖÏµÊı
+#define YAW_ANGLE_MAX_RELATIVE      2000.0f    // ½Ç¶È»·×î´óÊä³ö
+#define YAW_ANGLE_I_MAX_RELATIVE    0.5f       // ½Ç¶È»·»ı·ÖÏŞ·ù
+
+// ±àÂëÆ÷ËÙ¶È¿ØÖÆ£¨Ïà¶ÔËÙ¶È£©
+#define YAW_SPEED_KP_RELATIVE       6000.0f    // ËÙ¶È»·±ÈÀıÏµÊı
+#define YAW_SPEED_KI_RELATIVE       0.0f       // ËÙ¶È»·»ı·ÖÏµÊı
+#define YAW_SPEED_KD_RELATIVE       100.0f     // ËÙ¶È»·Î¢·ÖÏµÊı
+#define YAW_SPEED_MAX_RELATIVE      2000.0f   // ËÙ¶È»·×î´óÊä³ö
+#define YAW_SPEED_I_MAX_RELATIVE    200.0f     // ËÙ¶È»·»ı·ÖÏŞ·ù
+
+// ±àÂëÆ÷µçÁ÷¿ØÖÆ£¨Ïà¶ÔÄ£Ê½£©
+#define YAW_CURRENT_KP_RELATIVE     0          // µçÁ÷»·±ÈÀıÏµÊı£¨Î´Ê¹ÓÃ£©
+#define YAW_CURRENT_MAX_RELATIVE    2000     // µçÁ÷»·×î´óÊä³ö
+
+// ============================ YAWÖá¿ØÖÆ²ÎÊı£¨ÍÓÂİÒÇÄ£Ê½£© ============================
+// ÍÓÂİÒÇ½Ç¶È¿ØÖÆ£¨¾ø¶Ô½Ç¶È£©
+#define YAW_ANGLE_KP       25.0f               // ½Ç¶È»·±ÈÀıÏµÊı
+#define YAW_ANGLE_KI       0.0f                // ½Ç¶È»·»ı·ÖÏµÊı
+#define YAW_ANGLE_KD       5.0f                // ½Ç¶È»·Î¢·ÖÏµÊı
+#define YAW_ANGLE_MAX      6.0f                // ½Ç¶È»·×î´óÊä³ö
+#define YAW_ANGLE_I_MAX    0.5f                // ½Ç¶È»·»ı·ÖÏŞ·ù
+
+// ÍÓÂİÒÇËÙ¶È¿ØÖÆ£¨½ÇËÙ¶È£©
+#define YAW_SPEED_KP       150.0f             // ËÙ¶È»·±ÈÀıÏµÊı
+#define YAW_SPEED_KI       0.0f                // ËÙ¶È»·»ı·ÖÏµÊı
+#define YAW_SPEED_KD       5.0f              // ËÙ¶È»·Î¢·ÖÏµÊı
+#define YAW_SPEED_MAX      2000.0f            // ËÙ¶È»·×î´óÊä³ö
+#define YAW_SPEED_I_MAX    200.0f              // ËÙ¶È»·»ı·ÖÏŞ·ù
+
+// ÍÓÂİÒÇµçÁ÷¿ØÖÆ
+#define YAW_CURRENT_KP     0                   // µçÁ÷»·±ÈÀıÏµÊı£¨Î´Ê¹ÓÃ£©
+#define YAW_CURRENT_MAX    2000               // µçÁ÷»·×î´óÊä³ö
+
+// ============================ PITCHÖá¿ØÖÆ²ÎÊı£¨ÆÕÍ¨Ä£Ê½£© ============================
+// LQR¿ØÖÆ²ÎÊı - ËÙ¶È»·
+#define PITCH_SPEED_KP      2000               // ËÙ¶È»·±ÈÀıÏµÊı
+#define PITCH_SPEED_KI      0                  // ËÙ¶È»·»ı·ÖÏµÊı
+#define PITCH_SPEED_I_MAX   10000              // ËÙ¶È»·»ı·ÖÏŞ·ù
+#define PITCH_SPEED_MAX     16384              // ËÙ¶È»·×î´óÊä³ö
+
+// LQR¿ØÖÆ²ÎÊı - ½Ç¶È»·
+#define PITCH_ANGLE_KP      100                // ½Ç¶È»·±ÈÀıÏµÊı
+#define PITCH_ANGLE_KI      1                  // ½Ç¶È»·»ı·ÖÏµÊı
+#define PITCH_ANGLE_I_MAX   10000              // ½Ç¶È»·»ı·ÖÏŞ·ù
+#define PITCH_ANGLE_MAX     16384              // ½Ç¶È»·×î´óÊä³ö
+
+// LQR¿ØÖÆ²ÎÊı - µçÁ÷»·
+#define PITCH_CURRENT_KP    0.3                // µçÁ÷»·±ÈÀıÏµÊı
+#define PITCH_CURRENT_MAX   16384              // µçÁ÷»·×î´óÊä³ö
+
+/* ============ PITCH screw (3508 + C620) parameters ============ */
+#define PITCH_SCREW_RPM              3000.0f   /* fixed rotor rpm (before the 19.2 gearbox) */
+#define PITCH_SCREW_RC_THRESH          80      /* stick threshold for pitch */
+#define PITCH_SCREW_DIR              (+1.0f)   /* set -1.0f if up/down is reversed */
+#define PITCH_SCREW_SPEED_PID_KP       2.0f
+#define PITCH_SCREW_SPEED_PID_KI       0.0f
+#define PITCH_SCREW_SPEED_PID_KD       0.0f
+#define PITCH_SCREW_SPEED_MAX_OUT      8000.0f /* current limit, C620 full scale is 16384 */
+#define PITCH_SCREW_SPEED_MAX_IOUT     3000.0f
+
+// ============================ PITCHÖá¿ØÖÆ²ÎÊı£¨×ÔÃéÄ£Ê½£© ============================
+// LQR¿ØÖÆ²ÎÊı - ×ÔÃéËÙ¶È»·
+#define PITCH_SPEED_KP_AC   28000              // ×ÔÃéËÙ¶È»·±ÈÀıÏµÊı
+#define PITCH_SPEED_KI_AC   0                  // ×ÔÃéËÙ¶È»·»ı·ÖÏµÊı
+
+// LQR¿ØÖÆ²ÎÊı - ×ÔÃé½Ç¶È»·
+#define PITCH_ANGLE_KP_AC   250000             // ×ÔÃé½Ç¶È»·±ÈÀıÏµÊı
+#define PITCH_ANGLE_KI_AC   500                // ×ÔÃé½Ç¶È»·»ı·ÖÏµÊı
+
+// LQR¿ØÖÆ²ÎÊı - ×ÔÃéµçÁ÷»·
+#define PITCH_CURRENT_KP_AC 0.3                // ×ÔÃéµçÁ÷»·±ÈÀıÏµÊı
+
+// ============================ YAWÖá¿ØÖÆ²ÎÊı£¨×ÔÃéÄ£Ê½£© ============================
+// ×ÔÃé½Ç¶È¿ØÖÆ
+#define YAW_ANGLE_KP_AC       20.0f            // ×ÔÃé½Ç¶È»·±ÈÀıÏµÊı
+#define YAW_ANGLE_KI_AC       0.0f             // ×ÔÃé½Ç¶È»·»ı·ÖÏµÊı
+#define YAW_ANGLE_KD_AC       5.0f             // ×ÔÃé½Ç¶È»·Î¢·ÖÏµÊı
+#define YAW_ANGLE_AC_MAX      6.0f             // ×ÔÃé½Ç¶È»·×î´óÊä³ö
+#define YAW_ANGLE_I_AC_MAX    0.5f             // ×ÔÃé½Ç¶È»·»ı·ÖÏŞ·ù
+
+// ×ÔÃéËÙ¶È¿ØÖÆ
+#define YAW_SPEED_KP_AC       1300.0f          // ×ÔÃéËÙ¶È»·±ÈÀıÏµÊı
+#define YAW_SPEED_KI_AC       0.0f             // ×ÔÃéËÙ¶È»·»ı·ÖÏµÊı
+#define YAW_SPEED_KD_AC       300.0f           // ×ÔÃéËÙ¶È»·Î¢·ÖÏµÊı
+#define YAW_SPEED_AC_MAX      30000.0f         // ×ÔÃéËÙ¶È»·×î´óÊä³ö
+#define YAW_SPEED_I_AC_MAX    200.0f           // ×ÔÃéËÙ¶È»·»ı·ÖÏŞ·ù
+
+// ×ÔÃéµçÁ÷¿ØÖÆ
+#define YAW_CURRENT_KP_AC     0                // ×ÔÃéµçÁ÷»·±ÈÀıÏµÊı£¨Î´Ê¹ÓÃ£©
+#define YAW_CURRENT_AC_MAX    30000            // ×ÔÃéµçÁ÷»·×î´óÊä³ö
+
+// ============================ PITCHÖá´®¼¶PID²ÎÊı£¨·Ç×ÔÃé£© ============================
+// ½Ç¶È»·²ÎÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KP       35.0f      // ÍÓÂİÒÇ½Ç¶È»·±ÈÀıÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KI        0.0f      // ÍÓÂİÒÇ½Ç¶È»·»ı·ÖÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KD        0.0f      // ÍÓÂİÒÇ½Ç¶È»·Î¢·ÖÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_MAX_OUT   300.0f    // ÍÓÂİÒÇ½Ç¶È»·×î´óÊä³ö
+#define PITCH_GYRO_ABSOLUTE_PID_MAX_IOUT  2.1f      // ÍÓÂİÒÇ½Ç¶È»·»ı·ÖÏŞ·ù
+
+// ËÙ¶È»·²ÎÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KP        3000.0f   // ¾ø¶ÔËÙ¶È»·±ÈÀıÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KI        0.0f     // ¾ø¶ÔËÙ¶È»·»ı·ÖÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KD        200.0f     // ¾ø¶ÔËÙ¶È»·Î¢·ÖÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_MAX_OUT   16000.0f // ¾ø¶ÔËÙ¶È»·×î´óÊä³ö
+#define PITCH_ABSOLUTE_SPEED_PID_MAX_IOUT  10000.0f // ¾ø¶ÔËÙ¶È»·»ı·ÖÏŞ·ù
+
+// ============================ PITCHÖá´®¼¶PID²ÎÊı£¨×ÔÃé£© ============================
+// ×ÔÃé½Ç¶È»·²ÎÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KP_AC        40.5f    // ×ÔÃéÍÓÂİÒÇ½Ç¶È»·±ÈÀıÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KI_AC        0.0f     // ×ÔÃéÍÓÂİÒÇ½Ç¶È»·»ı·ÖÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_KD_AC        0.50f    // ×ÔÃéÍÓÂİÒÇ½Ç¶È»·Î¢·ÖÏµÊı
+#define PITCH_GYRO_ABSOLUTE_PID_MAX_OUT_AC   30.0f    // ×ÔÃéÍÓÂİÒÇ½Ç¶È»·×î´óÊä³ö
+#define PITCH_GYRO_ABSOLUTE_PID_MAX_IOUT_AC  2.1f     // ×ÔÃéÍÓÂİÒÇ½Ç¶È»·»ı·ÖÏŞ·ù
+
+// ×ÔÃéËÙ¶È»·²ÎÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KP_AC        3500.0f  // ×ÔÃé¾ø¶ÔËÙ¶È»·±ÈÀıÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KI_AC        0.0f     // ×ÔÃé¾ø¶ÔËÙ¶È»·»ı·ÖÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_KD_AC        30.0f    // ×ÔÃé¾ø¶ÔËÙ¶È»·Î¢·ÖÏµÊı
+#define PITCH_ABSOLUTE_SPEED_PID_MAX_OUT_AC   30000.0f // ×ÔÃé¾ø¶ÔËÙ¶È»·×î´óÊä³ö
+#define PITCH_ABSOLUTE_SPEED_PID_MAX_IOUT_AC  1000.0f  // ×ÔÃé¾ø¶ÔËÙ¶È»·»ı·ÖÏŞ·ù
+
+// ============================ Êı¾İ½á¹¹¶¨Òå ============================
 
 /**
- * @brief äº‘å°æ§åˆ¶æ¨¡å¼æšä¸¾
- * @note å®šä¹‰äº‘å°çš„ä¸åŒå·¥ä½œæ¨¡å¼
+ * @brief DMµç»ú¿ØÖÆÊı¾İ½á¹¹Ìå
+ * @note ÓÃÓÚÖ±Á÷µç»úµÄ¿ØÖÆ²ÎÊı
+ */
+typedef struct
+{
+	int8_t id;               // µç»úID
+	uint8_t start_flag;      // Æô¶¯±êÖ¾
+    int8_t mode;             // ¿ØÖÆÄ£Ê½
+	float vel_set;           // ËÙ¶ÈÉè¶¨Öµ
+	float tor_set;           // Å¤¾ØÉè¶¨Öµ
+	float kp_set;            // ±ÈÀıÏµÊıÉè¶¨Öµ
+	float kd_set;            // Î¢·ÖÏµÊıÉè¶¨Öµ
+} dm_motor_control;
+
+/**
+ * @brief ÔÆÌ¨¿ØÖÆÄ£Ê½Ã¶¾Ù
+ * @note ¶¨ÒåÔÆÌ¨µÄ²»Í¬¹¤×÷Ä£Ê½
  */
 typedef enum
 {
-	GIMBAL_OPERATING_MODE_ZERO_FORCE,  // äº‘å°æ— åŠ›æ¨¡å¼
-	GIMBAL_OPERATING_MODE_ABSOLUTE_ANGLE,        // äº‘å°ç»å¯¹è§’åº¦æ§åˆ¶æ¨¡å¼ï¼ˆåŸºäºé™€èºä»ªï¼‰
-	GIMBAL_OPERATING_MODE_ENCODER_ANGLE,     // äº‘å°ç›¸å¯¹è§’åº¦æ§åˆ¶æ¨¡å¼ï¼ˆåŸºäºç¼–ç å™¨ï¼‰
-	GIMBAL_OPERATING_MODE_AUTOMATIC_AIM,        // äº‘å°è‡ªåŠ¨ç„å‡†æ¨¡å¼
-} gimbal_operating_mode_t;
+	GIMBAL_ZERO_FORCE,  // ÔÆÌ¨ÎŞÁ¦Ä£Ê½
+	GIMBAL_GYRO,        // ÔÆÌ¨¾ø¶Ô½Ç¶È¿ØÖÆÄ£Ê½£¨»ùÓÚÍÓÂİÒÇ£©
+	GIMBAL_ENCONDE,     // ÔÆÌ¨Ïà¶Ô½Ç¶È¿ØÖÆÄ£Ê½£¨»ùÓÚ±àÂëÆ÷£©
+	GIMBAL_AUTO,        // ÔÆÌ¨×Ô¶¯Ãé×¼Ä£Ê½
+} gimbal_mode_e;
 
 /**
- * @brief ç”µæœºæ§åˆ¶æ¨¡å¼æšä¸¾
- * @note å®šä¹‰ç”µæœºçš„ä¸åŒæ§åˆ¶æ¨¡å¼
+ * @brief µç»ú¿ØÖÆÄ£Ê½Ã¶¾Ù
+ * @note ¶¨Òåµç»úµÄ²»Í¬¿ØÖÆÄ£Ê½
  */
 typedef enum
 {
-	MOTOR_CONTROL_MODE_ZERO_FORCE,  // ç”µæœºæ— åŠ›æ§åˆ¶
-	MOTOR_CONTROL_MODE_ABSOLUTE_ANGLE,        // ç”µæœºé™€èºä»ªæ§åˆ¶ï¼ˆç»å¯¹è§’åº¦ï¼‰
-	MOTOR_CONTROL_MODE_ENCODER_ANGLE,     // ç”µæœºç¼–ç å™¨æ§åˆ¶ï¼ˆç›¸å¯¹è§’åº¦ï¼‰
-} motor_control_mode_t;
+	MOTOR_ZERO_FORCE,  // µç»úÎŞÁ¦¿ØÖÆ
+	MOTOR_GYRO,        // µç»úÍÓÂİÒÇ¿ØÖÆ£¨¾ø¶Ô½Ç¶È£©
+	MOTOR_ENCONDE,     // µç»ú±àÂëÆ÷¿ØÖÆ£¨Ïà¶Ô½Ç¶È£©
+} gimbal_motor_mode_e;
 
 /**
- * @brief äº‘å°è·ŸéšçŠ¶æ€æšä¸¾
- * @note å®šä¹‰äº‘å°çš„æœå‘çŠ¶æ€
- * @noteã€å·²åœç”¨ã€‘ä¸€é”®æ‰å¤´è‡³æ­£ä½ï¼šæœºå™¨äººåŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒè¯¥æ¨¡å¼ï¼Œ
- *       GIMBAL_HEADING_REVERSED ä»…ä¸ºå…¼å®¹åº•ç›˜é€šä¿¡åè®®è€Œä¿ç•™ï¼Œè¿è¡Œä¸­ä¸ä¼šå†è¢«ä½¿ç”¨ã€‚
+ * @brief ÔÆÌ¨¸úËæ×´Ì¬Ã¶¾Ù
+ * @note ¶¨ÒåÔÆÌ¨µÄ³¯Ïò×´Ì¬
  */
 typedef enum
 {
-	GIMBAL_HEADING_FORWARD,   // æ­£å¸¸å‰å‘çŠ¶æ€ï¼ˆæ‰å¤´åœç”¨åæ’ä¸ºè¯¥å€¼ï¼‰
-    GIMBAL_HEADING_REVERSED,  // æ‰å¤´å‰å‘çŠ¶æ€ï¼ˆã€å·²åœç”¨ã€‘åŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒï¼‰
-} gimbal_heading_state_t;
+	GIMABL_NOMAL_FORWARD,   // Õı³£Ç°Ïò×´Ì¬
+    GIMABL_CHANGE_FORWARD,  // µôÍ·Ç°Ïò×´Ì¬
+} gimbal_follow_gimbal_state_e;
 
 /**
- * @brief äº‘å°ç”µæœºæ§åˆ¶æ•°æ®ç»“æ„ä½“
- * @note åŒ…å«äº‘å°å•ä¸ªç”µæœºçš„æ‰€æœ‰æ§åˆ¶å‚æ•°å’ŒçŠ¶æ€
+ * @brief ÔÆÌ¨µç»ú¿ØÖÆÊı¾İ½á¹¹Ìå
+ * @note °üº¬ÔÆÌ¨µ¥¸öµç»úµÄËùÓĞ¿ØÖÆ²ÎÊıºÍ×´Ì¬
  */
 typedef struct
 {  
-    const motor_measurement_t *motor_measurement_pointer;      // ç”µæœºæµ‹é‡æ•°æ®æŒ‡é’ˆ
-    motor_control_mode_t motor_control_mode;            // ç”µæœºå½“å‰æ§åˆ¶æ¨¡å¼
-    motor_control_mode_t previous_motor_control_mode;       // ç”µæœºä¸Šä¸€æ¬¡æ§åˆ¶æ¨¡å¼
+    const motor_measure_t *gimbal_motor_measure;      // µç»ú²âÁ¿Êı¾İÖ¸Õë
+    gimbal_motor_mode_e gimbal_motor_mode;            // µç»úµ±Ç°¿ØÖÆÄ£Ê½
+    gimbal_motor_mode_e gimbal_motor_mode_last;       // µç»úÉÏÒ»´Î¿ØÖÆÄ£Ê½
     
-    // æ§åˆ¶å™¨
-	lqr_type_def encoder_mode_controller;                                 // LQRæ§åˆ¶å™¨ï¼ˆPITCHç”¨ï¼‰
-	lqr_type_def automatic_aim_encoder_mode_controller;                              // è‡ªç„LQRæ§åˆ¶å™¨
-	pid_type_def speed_controller;                    // é€Ÿåº¦ç¯PIDæ§åˆ¶å™¨
-    pid_type_def screw_speed_controller;              /* screw pitch speed loop, rpm */
-	pid_type_def angle_controller;                    // è§’åº¦ç¯PIDæ§åˆ¶å™¨
-	pid_type_def relative_speed_controller;           // ç›¸å¯¹é€Ÿåº¦ç¯PIDæ§åˆ¶å™¨
-	pid_type_def relative_angle_controller;           // ç›¸å¯¹è§’åº¦ç¯PIDæ§åˆ¶å™¨
-	pid_type_def automatic_aim_speed_controller;                 // è‡ªç„é€Ÿåº¦ç¯PIDæ§åˆ¶å™¨
-	pid_type_def automatic_aim_angle_controller;                 // è‡ªç„è§’åº¦ç¯PIDæ§åˆ¶å™¨
+    // ¿ØÖÆÆ÷
+	lqr_type_def lqr;                                 // LQR¿ØÖÆÆ÷£¨PITCHÓÃ£©
+	lqr_type_def lqr_ac;                              // ×ÔÃéLQR¿ØÖÆÆ÷
+	pid_type_def pid_gimbal_speed;                    // ËÙ¶È»·PID¿ØÖÆÆ÷
+    pid_type_def pid_gimbal_screw_speed;              /* screw pitch speed loop, rpm */
+	pid_type_def pid_gimbal_angle;                    // ½Ç¶È»·PID¿ØÖÆÆ÷
+	pid_type_def pid_gimbal_speed_relative;           // Ïà¶ÔËÙ¶È»·PID¿ØÖÆÆ÷
+	pid_type_def pid_gimbal_angle_relative;           // Ïà¶Ô½Ç¶È»·PID¿ØÖÆÆ÷
+	pid_type_def pid_gimbal_speed_ac;                 // ×ÔÃéËÙ¶È»·PID¿ØÖÆÆ÷
+	pid_type_def pid_gimbal_angle_ac;                 // ×ÔÃé½Ç¶È»·PID¿ØÖÆÆ÷
     
-    // è§’åº¦ç›¸å…³
-    fp32 relative_angle_radian;                              // ç›¸å¯¹è§’åº¦ï¼ˆå¼§åº¦ï¼‰- ç¼–ç å™¨
-    fp32 maximum_relative_angle_radian;                          // æœ€å¤§ç›¸å¯¹è§’åº¦é™åˆ¶
-	fp32 minimum_relative_angle_radian;                          // æœ€å°ç›¸å¯¹è§’åº¦é™åˆ¶
-	fp32 relative_angle_setpoint_radian;                          // ç›¸å¯¹è§’åº¦è®¾å®šå€¼
-	fp32 relative_angular_velocity_radian_per_second;                              // ç›¸å¯¹è§’é€Ÿåº¦ï¼ˆç”µæœºè½¬é€Ÿè½¬æ¢ï¼‰
-	fp32 relative_angular_velocity_setpoint_radian_per_second;                          // ç›¸å¯¹è§’é€Ÿåº¦è®¾å®šå€¼ï¼ˆä¸²çº§æ§åˆ¶ç”¨ï¼‰
-    fp32 pitch_axis_screw_target_rotor_speed_revolution_per_minute;  // pitch ä¸æ†é€Ÿåº¦ç¯ç›®æ ‡ï¼ˆç”µæœºåæ ‡ç³»ï¼Œä¸åšå…³èŠ‚æ¢å‘ï¼‰
+    // ½Ç¶ÈÏà¹Ø
+    fp32 relative_angle;                              // Ïà¶Ô½Ç¶È£¨»¡¶È£©- ±àÂëÆ÷
+    fp32 max_relative_angle;                          // ×î´óÏà¶Ô½Ç¶ÈÏŞÖÆ
+	fp32 min_relative_angle;                          // ×îĞ¡Ïà¶Ô½Ç¶ÈÏŞÖÆ
+	fp32 relative_angle_set;                          // Ïà¶Ô½Ç¶ÈÉè¶¨Öµ
+	fp32 relative_omega;                              // Ïà¶Ô½ÇËÙ¶È£¨µç»ú×ªËÙ×ª»»£©
+	fp32 relative_omega_set;                          // Ïà¶Ô½ÇËÙ¶ÈÉè¶¨Öµ£¨´®¼¶¿ØÖÆÓÃ£©
     
-    // é™€èºä»ªç›¸å…³
-    fp32 absolute_angle_radian;                              // ç»å¯¹è§’åº¦ï¼ˆå¼§åº¦ï¼‰- é™€èºä»ª
-	fp32 absolute_angular_velocity_radian_per_second;                               // ç»å¯¹è§’é€Ÿåº¦ï¼ˆé™€èºä»ªæµ‹é‡ï¼‰
-	fp32 absolute_angular_velocity_setpoint_radian_per_second;                           // ç»å¯¹è§’é€Ÿåº¦è®¾å®šå€¼ï¼ˆä¸²çº§æ§åˆ¶ç”¨ï¼‰
-    fp32 maximum_absolute_angle_radian;                          // æœ€å¤§ç»å¯¹è§’åº¦é™åˆ¶
-	fp32 minimum_absolute_angle_radian;                          // æœ€å°ç»å¯¹è§’åº¦é™åˆ¶
-	fp32 absolute_angle_setpoint_radian;                          // ç»å¯¹è§’åº¦è®¾å®šå€¼
+    // ÍÓÂİÒÇÏà¹Ø
+    fp32 absolute_angle;                              // ¾ø¶Ô½Ç¶È£¨»¡¶È£©- ÍÓÂİÒÇ
+	fp32 absolute_gyro;                               // ¾ø¶Ô½ÇËÙ¶È£¨ÍÓÂİÒÇ²âÁ¿£©
+	fp32 absolute_gyro_set;                           // ¾ø¶Ô½ÇËÙ¶ÈÉè¶¨Öµ£¨´®¼¶¿ØÖÆÓÃ£©
+    fp32 max_absolute_angle;                          // ×î´ó¾ø¶Ô½Ç¶ÈÏŞÖÆ
+	fp32 min_absolute_angle;                          // ×îĞ¡¾ø¶Ô½Ç¶ÈÏŞÖÆ
+	fp32 absolute_angle_set;                          // ¾ø¶Ô½Ç¶ÈÉè¶¨Öµ
     
-    // ç”µæµæ§åˆ¶
-	fp32 commanded_torque_current_count;                                // è®¡ç®—å¾—åˆ°çš„ç”µæµå‘é€å€¼
-	fp32 measured_torque_current_count;                            // åé¦ˆå¾—åˆ°çš„æ‰­çŸ©ç”µæµ
+    // µçÁ÷¿ØÖÆ
+	fp32 give_current;                                // ¼ÆËãµÃµ½µÄµçÁ÷·¢ËÍÖµ
+	fp32 feedback_current;                            // ·´À¡µÃµ½µÄÅ¤¾ØµçÁ÷
     
-    // ç¼–ç å™¨ç›¸å…³
-	uint16_t zero_encoder_count;                       // ç›¸å¯¹è§’åº¦é›¶ç‚¹ï¼ˆç¼–ç å™¨å€¼ï¼‰
-	forward_feed angle_feedforward_calculation;                     // è§’åº¦å‰é¦ˆè®¡ç®—
-} gimbal_axis_state_t;
+    // ±àÂëÆ÷Ïà¹Ø
+	uint16_t relative_ecd_aero;                       // Ïà¶Ô½Ç¶ÈÁãµã£¨±àÂëÆ÷Öµ£©
+	forward_feed feed_angle_cacl;                     // ½Ç¶ÈÇ°À¡¼ÆËã
+    
+    // µç»ú×´Ì¬
+	int8_t id;                                        // µç»úID
+	uint8_t start_flag;                               // Æô¶¯±êÖ¾
+    int8_t mode;                                      // µç»úÄ£Ê½
+} gimbal_motor_t;
 
 /**
- * @brief äº‘å°çŠ¶æ€åˆ‡æ¢æ•°æ®ç»“æ„ä½“
- * @note ç”¨äºç®¡ç†äº‘å°çš„çŠ¶æ€åˆ‡æ¢å’Œæ‰å¤´é€»è¾‘
- * @noteã€å·²åœç”¨ã€‘æ‰å¤´é€»è¾‘ï¼šæœºå™¨äººåŠ è£…æœºæ¢°è‡‚åä¸å†æ”¯æŒâ€œæ‰å¤´è‡³æ­£ä½â€ï¼Œ
- *       gimbal_task.c ä¸­ç›¸å…³è§£æä¸è§’åº¦è¡¥å¿å·²æ³¨é‡Šï¼Œæœ¬ç»“æ„ä½“ä»…ä¿ç•™å­—æ®µä¸åˆå§‹åŒ–ï¼Œ
- *       heading_state / previous_heading_state æ’ä¸º GIMBAL_HEADING_FORWARDï¼Œ
- *       å„åˆ‡æ¢æ ‡å¿—ä¸è®¡æ—¶å™¨æ’ä¸º 0ã€‚
+ * @brief ÔÆÌ¨×´Ì¬ÇĞ»»Êı¾İ½á¹¹Ìå
+ * @note ÓÃÓÚ¹ÜÀíÔÆÌ¨µÄ×´Ì¬ÇĞ»»ºÍµôÍ·Âß¼­
  */
 typedef struct
 {
-	gimbal_heading_state_t heading_state;       // å½“å‰äº‘å°æ–¹å‘çŠ¶æ€ï¼ˆã€å·²åœç”¨ã€‘æ’ä¸ºå‰å‘ï¼‰
-	gimbal_heading_state_t previous_heading_state;  // ä¸Šä¸€æ¬¡äº‘å°æ–¹å‘çŠ¶æ€ï¼ˆã€å·²åœç”¨ã€‘æ’ä¸ºå‰å‘ï¼‰
-	uint8_t  heading_state_change_flag;                      // äº‘å°æ–¹å‘åˆ‡æ¢æ ‡å¿—ï¼ˆã€å·²åœç”¨ã€‘æ’ä¸º 0ï¼‰
-	uint32_t heading_state_change_time_millisecond;                      // äº‘å°æ–¹å‘åˆ‡æ¢è®¡æ—¶å™¨ï¼ˆã€å·²åœç”¨ã€‘ä¸å†æ›´æ–°ï¼‰
-	uint32_t heading_state_chassis_time_millisecond;              // äº‘å°ä¸åº•ç›˜åˆ‡æ¢è®¡æ—¶å™¨ï¼ˆã€å·²åœç”¨ã€‘ä¸å†æ›´æ–°ï¼‰
-	uint8_t  heading_state_chassis_change_flag;             // äº‘å°ä¸åº•ç›˜åˆ‡æ¢æ ‡å¿—ï¼ˆã€å·²åœç”¨ã€‘æ’ä¸º 0ï¼‰
-} gimbal_heading_transition_t;
+	gimbal_follow_gimbal_state_e gimbal_change;       // µ±Ç°ÔÆÌ¨·½Ïò×´Ì¬
+	gimbal_follow_gimbal_state_e gimbal_change_last;  // ÉÏÒ»´ÎÔÆÌ¨·½Ïò×´Ì¬
+	uint8_t  gimbal_change_flag;                      // ÔÆÌ¨·½ÏòÇĞ»»±êÖ¾
+	uint32_t gimbal_change_time;                      // ÔÆÌ¨·½ÏòÇĞ»»¼ÆÊ±Æ÷
+	uint32_t gimbal_change_chassis_time;              // ÔÆÌ¨Óëµ×ÅÌÇĞ»»¼ÆÊ±Æ÷
+	uint8_t  gimbal_chnamge_chassis_flag;             // ÔÆÌ¨Óëµ×ÅÌÇĞ»»±êÖ¾
+} gimbal_change_t;
 
 /**
- * @brief äº‘å°æ§åˆ¶ä¸»ç»“æ„ä½“
- * @note åŒ…å«äº‘å°çš„æ‰€æœ‰æ§åˆ¶å‚æ•°ã€çŠ¶æ€å’Œæ§åˆ¶å™¨
+ * @brief ÔÆÌ¨¿ØÖÆÖ÷½á¹¹Ìå
+ * @note °üº¬ÔÆÌ¨µÄËùÓĞ¿ØÖÆ²ÎÊı¡¢×´Ì¬ºÍ¿ØÖÆÆ÷
  */
 typedef struct
 {
-	gimbal_axis_state_t pitch_axis_state;                 // PITCHè½´ç”µæœºæ§åˆ¶æ•°æ®
-    gimbal_axis_state_t yaw_axis_state;                   // YAWè½´ç”µæœºæ§åˆ¶æ•°æ®
+	gimbal_motor_t pitch_gimbal_motor;                 // PITCHÖáµç»ú¿ØÖÆÊı¾İ
+    gimbal_motor_t yaw_gimbal_motor;                   // YAWÖáµç»ú¿ØÖÆÊı¾İ
     
-    // ä¼ æ„Ÿå™¨æ•°æ®æŒ‡é’ˆ
-	const fp32 *gimbal_INS_angle_point;                // IMUè§’åº¦æ•°æ®æŒ‡é’ˆ
-	const fp32 *gimbal_INS_gyro_point;                 // IMUè§’é€Ÿåº¦æ•°æ®æŒ‡é’ˆ
-	const RC_ctrl_t *gimbal_dt7_remote_control;        // é¥æ§å™¨æ•°æ®æŒ‡é’ˆ
-	const autom_pc *hero_pc;                           // PCé€šä¿¡æ•°æ®æŒ‡é’ˆ
+    // ´«¸ĞÆ÷Êı¾İÖ¸Õë
+	const fp32 *gimbal_INS_angle_point;                // IMU½Ç¶ÈÊı¾İÖ¸Õë
+	const fp32 *gimbal_INS_gyro_point;                 // IMU½ÇËÙ¶ÈÊı¾İÖ¸Õë
+	const RC_ctrl_t *gimbal_dt7_remote_control;        // Ò£¿ØÆ÷Êı¾İÖ¸Õë
+	const autom_pc *hero_pc;                           // PCÍ¨ĞÅÊı¾İÖ¸Õë
     
-    // äº‘å°çŠ¶æ€
-	gimbal_operating_mode_t gimbal_mode;                         // å½“å‰äº‘å°æ§åˆ¶æ¨¡å¼
-	gimbal_operating_mode_t gimbal_mode_last;                    // ä¸Šä¸€æ¬¡äº‘å°æ§åˆ¶æ¨¡å¼
-	gimbal_heading_transition_t heading_transition;               // äº‘å°è§’åº¦å˜åŒ–çŠ¶æ€
+    // ÔÆÌ¨×´Ì¬
+	gimbal_mode_e gimbal_mode;                         // µ±Ç°ÔÆÌ¨¿ØÖÆÄ£Ê½
+	gimbal_mode_e gimbal_mode_last;                    // ÉÏÒ»´ÎÔÆÌ¨¿ØÖÆÄ£Ê½
+	gimbal_change_t gimbal_angle_change;               // ÔÆÌ¨½Ç¶È±ä»¯×´Ì¬
 } gimbal_control_t;
 
-// ============================ å‡½æ•°å£°æ˜ ============================
+// ============================ º¯ÊıÉùÃ÷ ============================
 
 /**
- * @brief è·å–äº‘å°æ§åˆ¶ç»“æ„ä½“æŒ‡é’ˆ
- * @return äº‘å°æ§åˆ¶ç»“æ„ä½“æŒ‡é’ˆ
+ * @brief »ñÈ¡ÔÆÌ¨¿ØÖÆ½á¹¹ÌåÖ¸Õë
+ * @return ÔÆÌ¨¿ØÖÆ½á¹¹ÌåÖ¸Õë
  */
-extern gimbal_control_t *GetGimbalControlStatePointer(void);
+extern gimbal_control_t *get_gimbal_control_point(void);
 
 /**
- * @brief è‡ªåŠ¨æ¨¡å¼æ ‡å¿—ï¼ˆå‰å“¨ç«™ï¼‰
- * @note ç”¨äºæ¨¡å¼åˆ‡æ¢çš„çŠ¶æ€ç®¡ç†
+ * @brief ×Ô¶¯Ä£Ê½±êÖ¾£¨Ç°ÉÚÕ¾£©
+ * @note ÓÃÓÚÄ£Ê½ÇĞ»»µÄ×´Ì¬¹ÜÀí
  */
 extern uint8_t auto_mode_flag_qian;
 
 /**
- * @brief è‡ªåŠ¨æ¨¡å¼æ ‡å¿—
- * @note å½“å‰è‡ªåŠ¨æ¨¡å¼çŠ¶æ€
+ * @brief ×Ô¶¯Ä£Ê½±êÖ¾
+ * @note µ±Ç°×Ô¶¯Ä£Ê½×´Ì¬
  */
 extern uint8_t auto_mode_flag;
 
-#endif /* GIMBAL_TASK_H */
+/* ==================== YAW ÖáÈí¼şÏŞÎ»Óë»ØÎ» ==================== */
+/* »úĞµĞĞ³Ì£¨Ô­Ê¼ ECD£©£º×ó 0x2388(9096) ~ ÓÒ 0xA9B0(43440)
+ * ÔÊĞíÇø¼äÊÇ¡¸ÁíÍâ°ëÈ¦¡¹£º´ÓÓÒ¼«ÏŞ 43440 ¼ÌĞøÔö´ó£¬ÈÆ¹ı 0 µ½ 9096
+ * ÓÃÏà¶ÔÓÒ¼«ÏŞµÄÆ«ÒÆ phi ±íÊ¾£ºphi = (ecd - 43440) mod 65536
+ *   ÔÊĞí£ºphi ¡Ê [0, YAW_ECD_SPAN]
+ *   ½ûÖ¹£ºphi ¡Ê (YAW_ECD_SPAN, 65536)
+ * ×¢Òâ£ºYAW_LIMIT_DIR ±ØĞëÊµ²â±ê¶¨£¬Ìî·´»áÈÃ»ØÎ»Íù·´·½ÏòÅÜ */
+#define YAW_ECD_LIMIT_L         9050        // ×ó¼«ÏŞ 0x2388  
+#define YAW_ECD_LIMIT_R         40440       // ÓÒ¼«ÏŞ 0xA9B0  Ô½ÍùÓÒÊıÔ½Ğ¡
+#define YAW_ECD_SPAN            (((int32_t)YAW_ECD_LIMIT_L - (int32_t)YAW_ECD_LIMIT_R + 65536) % 65536)  // ÔÊĞíÇø¼ä³¤¶È£¬Ëæ L/R ×Ô¶¯±ä»¯
+#define YAW_ECD_TOL             400         // Ô½½çÈİ²î£¬³¬¹ı²ÅÆô¶¯»ØÎ»
+#define YAW_ECD_DEEP            4000        // ÔËĞĞÖĞÔ½½ç³¬¹ıÕâ¸öÉî¶È²Å»ØÖĞ£¨Ô¼ 22¡ã£©£¬·ÀÖ¹´òÏŞÎ»Ê±Îó´¥·¢
+#define YAW_ECD_SLOW            3000        // ¼õËÙÇø¿í¶È£¬Ô¼ 16.5¡ã
+#define YAW_SLOW_RATE           6.0f        // ¼õËÙÇøÆğµãÔÊĞíµÄ×î´ó½ÇËÙ¶È rad/s
+#define YAW_LIMIT_DIR           (+1)        // ±ê¶¨£º+1 ±íÊ¾ÕıµçÁ÷Ê¹ ECD Ôö´ó
 
+#define YAW_SAFE_IQ             300         // »ØÎ»µçÁ÷
+#define YAW_SAFE_SLOW           2000        // »ØÎ»Ä©¶Î¼õËÙ¾àÀë
+#define YAW_SAFE_TIMEOUT_MS     10000       // µ¥´Î»ØÎ»³¬Ê±
+#define YAW_SAFE_STALL_MS       200         // »ØÎ»¶Â×ªÅĞ¶¨Ê±¼ä
+#define YAW_SAFE_STALL_CNT      20          // »ØÎ»¶Â×ªÎ»ÒÆÃÅÏŞ
+#define YAW_BACKOFF_MS_1        300         // µÚ 1 ´ÎÖØÊÔµÈ´ı
+#define YAW_BACKOFF_MS_2        600         // µÚ 2 ´ÎÖØÊÔµÈ´ı
+#define YAW_BACKOFF_MS_3        1200        // µÚ 3 ´ÎÖØÊÔµÈ´ı
+
+#define YAW_RETREAT_CNT         1200        // ·´ÍË¾àÀë£¬Ô¼ 6.6¡ã
+#define YAW_RETREAT_IQ          600         // ·´ÍËµçÁ÷
+#define YAW_RETREAT_MS          800         // ·´ÍË×Ü³¬Ê±
+#define YAW_RETREAT_STALL_MS    200         // ·´ÍË²»¶¯ÅĞ¶¨Ê±¼ä
+#define YAW_RETREAT_STALL_CNT   2           // ·´ÍËÎ»ÒÆÃÅÏŞ
+
+#define YAW_ECD_LOST_MS         20          // 0x141 ·´À¡³¬Ê±
+#define YAW_STALL_IQ            1500        // ÔËĞĞ¶Â×ªµçÁ÷ÃÅÏŞ
+#define YAW_STALL_SPEED         50          // ÔËĞĞ¶Â×ª×ªËÙÃÅÏŞ
+#define YAW_STALL_MS            300         // ÔËĞĞ¶Â×ªÅĞ¶¨Ê±¼ä
+#define YAW_STALL_HOLD_MS       400         // ÔËĞĞ¶Â×ªÍ£»úÊ±³¤
+
+typedef enum
+{
+    YAW_LIMIT_IDLE = 0,
+    YAW_LIMIT_RECOVER,
+    YAW_LIMIT_BACKOFF,
+    YAW_LIMIT_RETREAT,
+    YAW_LIMIT_MANUAL,
+    YAW_LIMIT_DONE,
+} yaw_limit_state_e;
+
+extern volatile uint32_t yaw_ecd_update_tick;
+#endif /* GIMBAL_TASK_H */
 

@@ -13,7 +13,7 @@ static void Shoot_Mode_Set(hero_shoot_t *shoot_mode);                 // Éä»÷Ä£Ê
 static void Shoot_Feedback_Updata(hero_shoot_t *shoot_feedback_updata); // ·´À¡Êý¾Ý¸üÐÂ
 static void Shoot_Control_Set(hero_shoot_t *shoot_control_set);       // ¿ØÖÆÁ¿ÉèÖÃ
 
-static fp32 Motor_Ecd_To_Angle(uint16_t encoder_count,uint16_t encoder_zero_count); // µç»ú±àÂëÖµ×ª½Ç¶È
+static fp32 Motor_Ecd_To_Angle(uint16_t ecd,uint16_t ecd_zero_angle_set); // µç»ú±àÂëÖµ×ª½Ç¶È
 static void shoot_speed_set(hero_shoot_t *shoot_speed_set);            // Éä»÷ËÙ¶È¿ØÖÆ
 static void shoot_power_set(hero_shoot_t *shoot_speed_set);            // Ç¹¿ÚÈÈÁ¿¿ØÖÆ
 static void shoot_bullet_control(hero_shoot_t *shooot_bullet_control); // Éä»÷ÆµÂÊ¿ØÖÆ
@@ -51,7 +51,7 @@ void Shoot_Task(void const * argument)
        CAN_cmd_shoot(hero_shoot.shoot_motor_1.give_current,hero_shoot.shoot_motor_2.give_current,hero_shoot.shoot_motor_3.give_current);
        //tem_shoot_current = hero_shoot.trigger_motor.give_current=1000.0f;
        abs_limit(&hero_shoot.trigger_motor.give_current, 10000.0f);
-		CAN_cmd_trigger(hero_shoot.trigger_motor.give_current, mini_gimbal.yaw_axis_state.motor_measurement_pointer->encoder_count);
+		CAN_cmd_trigger(hero_shoot.trigger_motor.give_current, mini_gimbal.yaw_gimbal_motor.gimbal_motor_measure->ecd);
 
         
        cnt_shoot++;
@@ -68,13 +68,13 @@ static void Shoot_Init(hero_shoot_t *shoot_init)
     // »ñÈ¡Ò£¿ØÆ÷Êý¾ÝÖ¸Õë
     shoot_init->shoot_dt7_remote_control = get_dt7_remote_control_point();
     // »ñÈ¡Éä»÷µç»ú²âÁ¿Êý¾ÝÖ¸Õë
-    shoot_init->shoot_motor_1.shoot_motor_measure = GetRightFrictionWheelMotorMeasurementPointer();
-    shoot_init->shoot_motor_2.shoot_motor_measure = GetLeftFrictionWheelMotorMeasurementPointer();
-    shoot_init->shoot_motor_3.shoot_motor_measure = GetDownFrictionWheelMotorMeasurementPointer();
+    shoot_init->shoot_motor_1.shoot_motor_measure = get_motor_gimbal_fire_right_measure_point();
+    shoot_init->shoot_motor_2.shoot_motor_measure = get_motor_gimbal_fire_left_measure_point();
+    shoot_init->shoot_motor_3.shoot_motor_measure = get_motor_gimbal_fire_down_measure_point();
     // »ñÈ¡²¦µ¯µç»ú²âÁ¿Êý¾ÝÖ¸Õë
-    shoot_init->trigger_motor.trigger_motor_measure = GetTriggerMotorMeasurementPointer();
+    shoot_init->trigger_motor.trigger_motor_measure = get_motor_gimbal_trigger_measure_point();
     // »ñÈ¡ÔÆÌ¨¿ØÖÆÖ¸Õë
-    shoot_init->gimbal = GetGimbalControlStatePointer();
+    shoot_init->gimbal = get_gimbal_control_point();
     
     // ³õÊ¼»¯×´Ì¬
     shoot_init->shoot_mode = SHOOT_STOP;
@@ -115,7 +115,7 @@ static void Shoot_Init(hero_shoot_t *shoot_init)
 static void Shoot_Mode_Set(hero_shoot_t *shoot_mode)
 {
     // ±ÈÈüÄ£Ê½£¨ÓÒ²¦¸ËÉÏ£©
-    if(switch_is_up(shoot_mode->shoot_dt7_remote_control->rc.s[remote_control_right_switch]))
+    if(switch_is_up(shoot_mode->shoot_dt7_remote_control->rc.s[RIGHT]))
     {
         // °´¼ü´¥·¢Éä»÷Ä£Ê½ÇÐ»»£¨ÓÐ·À¶¶ÑÓÊ±£©
         if(shoot_mode->shoot_dt7_remote_control->key.v & FIRE_ON && 
@@ -148,7 +148,7 @@ static void Shoot_Mode_Set(hero_shoot_t *shoot_mode)
     else  // µ÷ÊÔÄ£Ê½
     {
         // ×ó²¦¸ËÉÏÎªÆô¶¯Éä»÷
-        if(switch_is_up(shoot_mode->shoot_dt7_remote_control->rc.s[remote_control_left_switch])  ||  (switch_is_down(shoot_mode->shoot_dt7_remote_control->rc.s[remote_control_left_switch])&&(switch_is_down(shoot_mode->shoot_dt7_remote_control->rc.s[remote_control_right_switch]))))
+        if(switch_is_up(shoot_mode->shoot_dt7_remote_control->rc.s[LEFT])  ||  (switch_is_down(shoot_mode->shoot_dt7_remote_control->rc.s[LEFT])&&(switch_is_down(shoot_mode->shoot_dt7_remote_control->rc.s[RIGHT]))))
         {  
             shoot_mode->shoot_mode = SHOOT_START;
         }
@@ -168,25 +168,25 @@ static void Shoot_Feedback_Updata(hero_shoot_t *shoot_feedback_updata)
 {
     // ²¦µ¯µç»ú·´À¡Êý¾Ý
     shoot_feedback_updata->trigger_motor.feedback_current = 
-        shoot_feedback_updata->trigger_motor.trigger_motor_measure->measured_torque_current_count * MOTOR_A;
+        shoot_feedback_updata->trigger_motor.trigger_motor_measure->given_current * MOTOR_A;
     shoot_feedback_updata->trigger_motor.feedback_speed = 
-        shoot_feedback_updata->trigger_motor.trigger_motor_measure->rotor_speed_revolution_per_minute * MOTOR_RPM_TO_SPEED;
+        shoot_feedback_updata->trigger_motor.trigger_motor_measure->speed_rpm * MOTOR_RPM_TO_SPEED;
     
     // Ä¦²ÁÂÖµç»úËÙ¶È·´À¡
     shoot_feedback_updata->shoot_motor_1.feedback_speed = 
-        shoot_feedback_updata->shoot_motor_1.shoot_motor_measure->rotor_speed_revolution_per_minute;
+        shoot_feedback_updata->shoot_motor_1.shoot_motor_measure->speed_rpm;
     shoot_feedback_updata->shoot_motor_2.feedback_speed = 
-        shoot_feedback_updata->shoot_motor_2.shoot_motor_measure->rotor_speed_revolution_per_minute;
+        shoot_feedback_updata->shoot_motor_2.shoot_motor_measure->speed_rpm;
     shoot_feedback_updata->shoot_motor_3.feedback_speed = 
-        shoot_feedback_updata->shoot_motor_3.shoot_motor_measure->rotor_speed_revolution_per_minute;
+        shoot_feedback_updata->shoot_motor_3.shoot_motor_measure->speed_rpm;
     
     // Êó±ê°´¼ü×´Ì¬
     shoot_feedback_updata->last_press_r = shoot_feedback_updata->last_press_l;
     shoot_feedback_updata->press_l = shoot_feedback_updata->shoot_dt7_remote_control->mouse.press_l;
     
     // ²¦µ¯ÅÌ±àÂëÆ÷Êý¾Ý´¦Àí
-    float fix_dials_ecd = (float)shoot_feedback_updata->trigger_motor.trigger_motor_measure->encoder_count;
-    float fix_last_dials_ecd = (float)shoot_feedback_updata->trigger_motor.trigger_motor_measure->previous_encoder_count;
+    float fix_dials_ecd = (float)shoot_feedback_updata->trigger_motor.trigger_motor_measure->ecd;
+    float fix_last_dials_ecd = (float)shoot_feedback_updata->trigger_motor.trigger_motor_measure->last_ecd;
     shoot_feedback_updata->trigger_motor.dials_ecd_count = fix_dials_ecd - fix_last_dials_ecd;
     
     // ±àÂëÆ÷Òç³ö´¦Àí
@@ -272,25 +272,25 @@ static void Shoot_Cacl_Loop(hero_shoot_t *shoot_cacl)
 
 /**
   * @brief µç»ú±àÂëÖµ×ª»»Îª½Ç¶È
-  * @param encoder_count: µ±Ç°±àÂëÖµ
-  * @param encoder_zero_count: Áãµã±àÂëÖµ
+  * @param ecd: µ±Ç°±àÂëÖµ
+  * @param ecd_zero_angle_set: Áãµã±àÂëÖµ
   * @return ¼ÆËãµÃµ½µÄ½Ç¶ÈÖµ
   */
-static fp32 Motor_Ecd_To_Angle(uint16_t encoder_count, uint16_t encoder_zero_count)
+static fp32 Motor_Ecd_To_Angle(uint16_t ecd, uint16_t ecd_zero_angle_set)
 {
-    int32_t relative_ecd = encoder_count - encoder_zero_count;
+    int32_t relative_ecd = ecd - ecd_zero_angle_set;
     
     // ´¦Àí±àÂëÆ÷Òç³ö
-    if(relative_ecd > encoder_count_half_range)
+    if(relative_ecd > HALF_ECD_RANGE)
     {
-        relative_ecd -= encoder_count_range;
+        relative_ecd -= ECD_RANGE;
     }
-    else if(relative_ecd < -encoder_count_half_range)
+    else if(relative_ecd < -HALF_ECD_RANGE)
     {
-        relative_ecd += encoder_count_range;
+        relative_ecd += ECD_RANGE;
     }
     
-    return relative_ecd * motor_encoder_count_to_rotor_radian;
+    return relative_ecd * MOTOR_ECD_TO_RAD;
 }
 
 /**
@@ -299,9 +299,9 @@ static fp32 Motor_Ecd_To_Angle(uint16_t encoder_count, uint16_t encoder_zero_cou
   */
 static void shoot_speed_set(hero_shoot_t *shoot_speed_set)
 {
-  if((switch_is_up(shoot_speed_set->shoot_dt7_remote_control->rc.s[remote_control_left_switch])))  // ÉèÖÃÄ¦²ÁÂÖµç»úÄ¿±êËÙ¶È
-	{shoot_speed_set->shoot_motor_1.speed_set =4200;  // ÓÒÄ¦²ÁÂÖ
-    shoot_speed_set->shoot_motor_2.speed_set = -4200;   // ×óÄ¦²ÁÂÖ
+  if((switch_is_up(shoot_speed_set->shoot_dt7_remote_control->rc.s[LEFT])))  // ÉèÖÃÄ¦²ÁÂÖµç»úÄ¿±êËÙ¶È
+	{shoot_speed_set->shoot_motor_1.speed_set =-1800;  // ÓÒÄ¦²ÁÂÖ
+    shoot_speed_set->shoot_motor_2.speed_set = 1800;   // ×óÄ¦²ÁÂÖ
     shoot_speed_set->shoot_motor_3.speed_set = 4100;   // ÏÂÄ¦²ÁÂÖ
 	}
 	else
@@ -323,13 +323,13 @@ static void shoot_power_set(hero_shoot_t *shoot_speed_set)
     shoot_speed_set->trigger_motor.fire_power_flag = 1;
     
     // ¸ù¾Ý°´¼üÉèÖÃÉä»÷ÆµÂÊ
-    if(switch_is_up(shoot_speed_set->shoot_dt7_remote_control->rc.s[remote_control_left_switch]))
+    if(switch_is_up(shoot_speed_set->shoot_dt7_remote_control->rc.s[LEFT]))
     {
-        shoot_speed_set->trigger_motor.shoot_ban_hz = 1000; // ÆÕÍ¨Éä»÷Ä£Ê½
+        shoot_speed_set->trigger_motor.shoot_ban_hz = 300; // ÆÕÍ¨Éä»÷Ä£Ê½
     }
     else
     {
-            shoot_speed_set->trigger_motor.shoot_ban_hz = 300;
+            shoot_speed_set->trigger_motor.shoot_ban_hz = 1000;
     }
 }
 
@@ -344,7 +344,7 @@ static void shoot_bullet_control(hero_shoot_t *shooot_bullet_control)
     if(((shooot_bullet_control->press_l == 1) || 
         shooot_bullet_control->shoot_dt7_remote_control->rc.ch[4] >= 300 || 
         (shooot_bullet_control->gimbal->hero_pc->pc_fire_mode == 2 && 
-         shooot_bullet_control->gimbal->gimbal_mode == GIMBAL_OPERATING_MODE_AUTOMATIC_AIM)) && 
+         shooot_bullet_control->gimbal->gimbal_mode == GIMBAL_AUTO)) && 
        (shooot_bullet_control->trigger_motor.shoot_ban_time_hz == 0) && 
        shooot_bullet_control->trigger_motor.fire_power_flag == 1)
     {
@@ -372,7 +372,7 @@ static void shoot_bullet_control(hero_shoot_t *shooot_bullet_control)
     // ÉèÖÃ²¦µ¯µç»úÄ¿±ê½Ç¶È
     if(shooot_bullet_control->trigger_motor.fire_ban_hz == 1)
     {
-         if(switch_is_up(shooot_bullet_control->shoot_dt7_remote_control->rc.s[remote_control_left_switch]))
+         if(switch_is_down(shooot_bullet_control->shoot_dt7_remote_control->rc.s[LEFT]))
         // ¿ØÖÆ²¦µ¯ÅÌÐý×ªÒ»¸öµ¯²ÖÎ»ÖÃ£¨40¶È£©
        { 
       
@@ -388,7 +388,7 @@ static void shoot_bullet_control(hero_shoot_t *shooot_bullet_control)
         //             shooot_bullet_control->trigger_motor.add_angle - need_angle;
         //     }
 		}
-		else if (switch_is_down(shooot_bullet_control->shoot_dt7_remote_control->rc.s[remote_control_left_switch]))
+		else if (switch_is_up(shooot_bullet_control->shoot_dt7_remote_control->rc.s[LEFT]))
 		{
 					
             shooot_bullet_control->trigger_motor.trigger_motor_angle_set += need_angle;
@@ -432,7 +432,7 @@ static void trigger_motor_turn_back(hero_shoot_t *shoot_block)
     {
         if(shoot_block->trigger_motor.tigger_bolck.reverse_time == 1)
         {  
-            if(switch_is_up(shoot_block->shoot_dt7_remote_control->rc.s[remote_control_left_switch]))
+            if(switch_is_up(shoot_block->shoot_dt7_remote_control->rc.s[LEFT]))
             // ÉèÖÃ·´×ª½Ç¶È
            { shoot_block->trigger_motor.trigger_motor_angle_set = 
                 shoot_block->trigger_motor.add_angle + block_need_angle;}
